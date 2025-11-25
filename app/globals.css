@@ -3,6 +3,89 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* BaseNeue Font - Modern sans-serif for UI elements */
+@font-face {
+  font-family: 'BaseNeue';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/BaseNeue-Regular.woff2') format('woff2'),
+       url('/fonts/BaseNeue-Regular.woff') format('woff'),
+       local('BaseNeue Regular');
+}
+
+@font-face {
+  font-family: 'BaseNeue';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/BaseNeue-Medium.woff2') format('woff2'),
+       url('/fonts/BaseNeue-Medium.woff') format('woff'),
+       local('BaseNeue Medium');
+}
+
+@font-face {
+  font-family: 'BaseNeue';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/BaseNeue-SemiBold.woff2') format('woff2'),
+       url('/fonts/BaseNeue-SemiBold.woff') format('woff'),
+       local('BaseNeue SemiBold');
+}
+
+@font-face {
+  font-family: 'BaseNeue';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/BaseNeue-Bold.woff2') format('woff2'),
+       url('/fonts/BaseNeue-Bold.woff') format('woff'),
+       local('BaseNeue Bold');
+}
+
+/* Power Grotesk Font - Add font files to public/fonts/ directory */
+/* Download from https://power-type.com/power-grotesk/ */
+@font-face {
+  font-family: 'Power Grotesk';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/PowerGrotesk-Regular.woff2') format('woff2'),
+       url('/fonts/PowerGrotesk-Regular.woff') format('woff'),
+       local('Power Grotesk Regular');
+}
+
+@font-face {
+  font-family: 'Power Grotesk';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/PowerGrotesk-Medium.woff2') format('woff2'),
+       url('/fonts/PowerGrotesk-Medium.woff') format('woff'),
+       local('Power Grotesk Medium');
+}
+
+@font-face {
+  font-family: 'Power Grotesk';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/PowerGrotesk-SemiBold.woff2') format('woff2'),
+       url('/fonts/PowerGrotesk-SemiBold.woff') format('woff'),
+       local('Power Grotesk SemiBold');
+}
+
+@font-face {
+  font-family: 'Power Grotesk';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/PowerGrotesk-Bold.woff2') format('woff2'),
+       url('/fonts/PowerGrotesk-Bold.woff') format('woff'),
+       local('Power Grotesk Bold');
+}
+
 :root {
   /* Light mode colors - white background with dark text */
   --background: oklch(0.98 0 0); /* White */
@@ -162,8 +245,11 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
-  /* Updated font families to Space Grotesk and Outfit for bold, modern look */
-  --font-sans: "Space Grotesk", "Space Grotesk Fallback", system-ui, sans-serif;
+  /* Updated font families - Power Grotesk for headings, BaseNeue for UI elements */
+  /* Note: Download fonts and place .woff2 files in public/fonts/ */
+  /* Space Grotesk is used as fallback until custom fonts are added */
+  --font-sans: "Power Grotesk", "Space Grotesk", "Space Grotesk Fallback", system-ui, sans-serif;
+  --font-ui: "BaseNeue", "Space Grotesk", system-ui, sans-serif;
   --font-mono: "Outfit", "Outfit Fallback", monospace;
 }
 
@@ -171,8 +257,42 @@
   * {
     @apply border-border outline-ring/50;
   }
-  body {
+  
+  /* BaseNeue as primary font for all UI */
+  body, html {
     @apply bg-background text-foreground;
+    font-family: var(--font-ui);
+  }
+  
+  /* Power Grotesk for headings and bold text */
+  h1, h2, h3, h4, h5, h6,
+  .font-bold, .font-black,
+  button, .btn,
+  .text-2xl, .text-3xl, .text-4xl, .text-5xl, .text-6xl {
+    font-family: var(--font-sans);
+  }
+  
+  /* BaseNeue for UI elements, inputs, labels, body text */
+  input, textarea, select,
+  label, .label,
+  .text-sm, .text-xs, .text-base, .text-lg, .text-xl,
+  p, span, div, a {
+    font-family: var(--font-ui);
+  }
+  
+  /* Ensure onboarding uses BaseNeue */
+  .onboarding,
+  .onboarding * {
+    font-family: var(--font-ui);
+  }
+  
+  /* Headings in onboarding use Power Grotesk */
+  .onboarding h1,
+  .onboarding h2,
+  .onboarding h3,
+  .onboarding .font-bold,
+  .onboarding .font-black {
+    font-family: var(--font-sans);
   }
 }
 
@@ -257,5 +377,36 @@
     50% {
       background-position: 100% 50%;
     }
+  }
+
+  /* Avatar modal responsive fixes */
+  .avatar-modal-container {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    max-width: 100vw !important;
+    max-height: 100vh !important;
+    overflow: hidden !important;
+  }
+
+  @media (min-width: 768px) {
+    .avatar-modal-container > div {
+      width: 90vw !important;
+      height: 85vh !important;
+      max-width: 1200px !important;
+      margin: auto !important;
+    }
+  }
+
+  /* Prevent body scroll when modal is open */
+  body.modal-open {
+    overflow: hidden !important;
+    position: fixed !important;
+    width: 100% !important;
+    height: 100% !important;
   }
 }

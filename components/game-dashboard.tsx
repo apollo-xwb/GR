@@ -27,52 +27,81 @@ import { LoanManagement } from "./loan-management"
 import { TierProgression } from "./tier-progression"
 import { BlockchainWallet } from "./blockchain-wallet"
 import { TransactionHistory } from "./transaction-history"
+import { Swop } from "./swop"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useAuth } from "@/contexts/auth-context"
+import { updateUserPreferences } from "@/lib/firebase/users"
 
-export function GameDashboard() {
-  const [balance] = useState(8700.46)
-  const [xp] = useState(2450)
-  const [tier] = useState("Silver")
-  const [maxXP] = useState(5000)
-  const [loanLimit] = useState(1000)
-  const [activeLoan] = useState(true)
-  const [completedLoans] = useState(12)
+interface GameDashboardProps {
+  activeTab?: string
+  onTabChange?: (tab: string) => void
+}
+
+export function GameDashboard({ activeTab: externalActiveTab, onTabChange }: GameDashboardProps) {
+  const { user, userProfile } = useAuth()
+  
+  // Use Firebase data if available, otherwise use defaults
+  const balance = userProfile?.balance || 8700.46
+  const xp = userProfile?.xp || 2450
+  const tier = userProfile?.tier || "Silver"
+  const maxXP = 5000
+  const loanLimit = userProfile?.loanLimit || 1000
+  const activeLoan = userProfile?.activeLoan || false
+  const completedLoans = userProfile?.completedLoans || 12
   const [showHistory, setShowHistory] = useState(false)
-  const [currentTheme, setCurrentTheme] = useState("sunset")
+  const currentTheme = userProfile?.theme || "sunset"
   const [showThemeSelector, setShowThemeSelector] = useState(false)
-  const [isDarkMode, setIsDarkMode] = useState(true)
-  const [userName, setUserName] = useState("Player One")
-
-  useEffect(() => {
-    const savedName = localStorage.getItem("userName")
-    if (savedName) {
-      setUserName(savedName)
+  const isDarkMode = userProfile?.darkMode !== undefined ? userProfile.darkMode : true
+  const userName = userProfile?.userName || "Player One"
+  const [internalTab, setInternalTab] = useState("dashboard")
+  
+  // Use external tab if provided, otherwise use internal state
+  const activeTab = externalActiveTab || internalTab
+  const handleTabChange = (tab: string) => {
+    if (onTabChange) {
+      onTabChange(tab)
+    } else {
+      setInternalTab(tab)
     }
-
-    // Load dark mode preference
-    const savedMode = localStorage.getItem("darkMode")
-    const isDark = savedMode === null ? true : savedMode === "true"
-    setIsDarkMode(isDark)
-
-    // Load theme preference
-    const savedTheme = localStorage.getItem("theme") || "sunset"
-    setCurrentTheme(savedTheme)
-
-    // Apply both theme and dark mode together to prevent glitching
-    document.documentElement.className = `theme-${savedTheme} ${isDark ? "dark" : ""}`
-  }, [])
-
-  const applyTheme = (themeId: string) => {
-    setCurrentTheme(themeId)
-    localStorage.setItem("theme", themeId)
-    document.documentElement.className = `theme-${themeId} ${isDarkMode ? "dark" : ""}`
   }
 
-  const toggleDarkMode = () => {
+  useEffect(() => {
+    // Apply theme and dark mode from user profile or localStorage
+    const theme = userProfile?.theme || localStorage.getItem("theme") || "sunset"
+    const darkMode = userProfile?.darkMode !== undefined 
+      ? userProfile.darkMode 
+      : localStorage.getItem("darkMode") === "true"
+    
+    document.documentElement.className = `theme-${theme} ${darkMode ? "dark" : ""}`
+  }, [userProfile])
+
+  const applyTheme = async (themeId: string) => {
+    localStorage.setItem("theme", themeId)
+    document.documentElement.className = `theme-${themeId} ${isDarkMode ? "dark" : ""}`
+    
+    // Save to Firebase if user is authenticated
+    if (user?.uid) {
+      try {
+        await updateUserPreferences(user.uid, { theme: themeId })
+      } catch (error) {
+        console.error("Error saving theme to Firebase:", error)
+      }
+    }
+  }
+
+  const toggleDarkMode = async () => {
     const newMode = !isDarkMode
-    setIsDarkMode(newMode)
     localStorage.setItem("darkMode", String(newMode))
     document.documentElement.className = `theme-${currentTheme} ${newMode ? "dark" : ""}`
+    
+    // Save to Firebase if user is authenticated
+    if (user?.uid) {
+      try {
+        await updateUserPreferences(user.uid, { darkMode: newMode })
+      } catch (error) {
+        console.error("Error saving dark mode to Firebase:", error)
+      }
+    }
   }
 
   const getAvatarEmote = () => {
@@ -97,11 +126,32 @@ export function GameDashboard() {
     { id: "neon", name: "Neon", colors: ["#F472B6", "#EC4899", "#DB2777"] },
   ]
 
+  // Handle bottom nav tab changes
+  useEffect(() => {
+    if (activeTab === "swop") {
+      // $SWOP view is handled in main render
+    } else if (activeTab === "wallet") {
+      handleTabChange("wallet")
+    } else if (activeTab === "history") {
+      setShowHistory(true)
+    } else if (activeTab === "home") {
+      handleTabChange("dashboard")
+      setShowHistory(false)
+    } else if (activeTab === "profile") {
+      // Profile view - can be implemented later
+      handleTabChange("dashboard")
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab])
+
   if (showHistory) {
     return (
       <div className="min-h-screen p-4 pb-20 max-w-2xl mx-auto">
         <div className="flex items-center gap-3 mb-6">
-          <Button size="icon" variant="ghost" onClick={() => setShowHistory(false)}>
+          <Button size="icon" variant="ghost" onClick={() => {
+            setShowHistory(false)
+            handleTabChange("home")
+          }}>
             <ChevronRight className="h-5 w-5 rotate-180" />
           </Button>
           <div>
@@ -114,8 +164,13 @@ export function GameDashboard() {
     )
   }
 
+  // Show $SWOP view
+  if (activeTab === "swop") {
+    return <Swop />
+  }
+
   return (
-    <div className="min-h-screen p-4 pb-20 max-w-2xl mx-auto">
+    <div className="min-h-screen p-3 sm:p-4 pb-20 sm:pb-24 max-w-2xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           <Badge className="heatwave-gradient border-0 px-3 py-1 font-bold text-white shadow-lg">
@@ -194,8 +249,8 @@ export function GameDashboard() {
         </div>
       </Card>
 
-      <Tabs defaultValue="dashboard" className="w-full">
-        <TabsList className="grid w-full grid-cols-4 mb-6 bg-secondary/50">
+      <Tabs value={activeTab === "wallet" ? "wallet" : activeTab === "dashboard" ? "dashboard" : "dashboard"} onValueChange={handleTabChange} className="w-full">
+        <TabsList className="grid w-full grid-cols-4 mb-6 bg-secondary/50 hidden md:grid">
           <TabsTrigger value="dashboard">Home</TabsTrigger>
           <TabsTrigger value="loans">Loans</TabsTrigger>
           <TabsTrigger value="progression">Tiers</TabsTrigger>

@@ -4,6 +4,27 @@ import { Space_Grotesk, Outfit } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import "./globals.css"
 
+// Ensure environment variables are available
+if (typeof window === "undefined") {
+  // Server-side: validate env vars exist
+  const requiredEnvVars = [
+    "NEXT_PUBLIC_API_KEY",
+    "NEXT_PUBLIC_AUTH_DOMAIN",
+    "NEXT_PUBLIC_PROJECT_ID",
+    "NEXT_PUBLIC_STORAGE_BUCKET",
+    "NEXT_PUBLIC_MESSAGING_SENDER_ID",
+    "NEXT_PUBLIC_APP_ID",
+  ]
+  
+  const missing = requiredEnvVars.filter(
+    (varName) => !process.env[varName]
+  )
+  
+  if (missing.length > 0) {
+    console.warn(`Missing Firebase environment variables: ${missing.join(", ")}`)
+  }
+}
+
 const spaceGrotesk = Space_Grotesk({
   subsets: ["latin"],
   variable: "--font-space-grotesk",

@@ -7,17 +7,36 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Zap, Rocket, Shield, Trophy, Sparkles, ArrowRight, Wallet, Target, TrendingUp, X } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { useAuth } from "@/contexts/auth-context"
+import { saveAvatar, updateUserPreferences, updateUserStats } from "@/lib/firebase/users"
 
 interface OnboardingProps {
   onComplete: () => void
 }
 
 export function Onboarding({ onComplete }: OnboardingProps) {
+  const { user, userProfile } = useAuth()
   const [step, setStep] = useState(0)
-  const [name, setName] = useState("")
-  const [selectedTheme, setSelectedTheme] = useState("sunset")
+  const [name, setName] = useState(userProfile?.userName || "")
+  const [selectedTheme, setSelectedTheme] = useState(userProfile?.theme || "sunset")
   const [showAvatarCreator, setShowAvatarCreator] = useState(false)
-  const [avatarCreated, setAvatarCreated] = useState(false)
+  const [avatarCreated, setAvatarCreated] = useState(!!userProfile?.readyPlayerMeAvatar)
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(userProfile?.readyPlayerMeAvatar || null)
+  const [showSuccess, setShowSuccess] = useState(false)
+  const [saving, setSaving] = useState(false)
+  
+  // Handle body scroll lock when modal is open
+  useEffect(() => {
+    if (showAvatarCreator) {
+      // Lock body scroll
+      document.body.classList.add('modal-open')
+      
+      return () => {
+        // Restore body scroll
+        document.body.classList.remove('modal-open')
+      }
+    }
+  }, [showAvatarCreator])
 
   const themes = [
     { id: "sunset", name: "Sunset", colors: ["#FF6B35", "#F7931E", "#E94823"] },
@@ -51,42 +70,112 @@ export function Onboarding({ onComplete }: OnboardingProps) {
   ]
 
   useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
+    const handleMessage = async (event: MessageEvent) => {
       if (event.data?.source === "readyplayerme") {
+        // Handle avatar export
         if (event.data.eventName === "v1.avatar.exported") {
-          const avatarUrl = event.data.data.url
-          console.log("[v0] Onboarding avatar created:", avatarUrl)
-          localStorage.setItem("readyPlayerMeAvatar", avatarUrl)
+          const newAvatarUrl = event.data.data.url
+          console.log("[v0] Onboarding avatar created:", newAvatarUrl)
+          
+          // Save to localStorage for immediate use
+          localStorage.setItem("readyPlayerMeAvatar", newAvatarUrl)
+          
+          // Set avatar URL and show success message
+          setAvatarUrl(newAvatarUrl)
           setAvatarCreated(true)
           setShowAvatarCreator(false)
+          setShowSuccess(true)
+        }
+        
+        // Handle template selection
+        if (event.data.eventName === "v1.frame.ready") {
+          console.log("Ready Player Me frame is ready")
+        }
+        
+        // Handle any template selection events
+        if (event.data.eventName === "v1.avatar.generated" || event.data.eventName === "v1.avatar.updated") {
+          console.log("Avatar template/update event:", event.data)
+          // Save template selection if available
+          if (event.data.data?.url && user?.uid) {
+            try {
+              await saveAvatar(user.uid, event.data.data.url)
+              // Also save template info if available
+              if (event.data.data?.templateId || event.data.data?.template) {
+                await updateUserPreferences(user.uid, {
+                  selectedTemplate: event.data.data.templateId || event.data.data.template,
+                })
+              }
+              console.log("Template selection saved to Firebase")
+            } catch (error) {
+              console.error("Error saving template to Firebase:", error)
+            }
+          }
+        }
+        
+        // Handle template selection specifically
+        if (event.data.eventName === "v1.avatar.template.selected" || 
+            (event.data.eventName === "v1.frame.ready" && event.data.data?.template)) {
+          console.log("Template selected:", event.data)
+          if (user?.uid && event.data.data?.template) {
+            try {
+              await updateUserPreferences(user.uid, {
+                selectedTemplate: event.data.data.template,
+              })
+              console.log("Template saved to Firebase")
+            } catch (error) {
+              console.error("Error saving template to Firebase:", error)
+            }
+          }
         }
       }
     }
 
     window.addEventListener("message", handleMessage)
     return () => window.removeEventListener("message", handleMessage)
-  }, [])
+  }, [user])
 
-  const applyTheme = (themeId: string) => {
+  const applyTheme = async (themeId: string) => {
     setSelectedTheme(themeId)
     const savedMode = localStorage.getItem("darkMode")
     const isDark = savedMode === null ? true : savedMode === "true"
     document.documentElement.className = `theme-${themeId} ${isDark ? "dark" : ""}`
+    
+    // Save to Firebase if user is authenticated
+    if (user?.uid) {
+      try {
+        await updateUserPreferences(user.uid, { theme: themeId })
+      } catch (error) {
+        console.error("Error saving theme to Firebase:", error)
+      }
+    }
   }
 
-  const handleComplete = () => {
+  const handleComplete = async () => {
     localStorage.setItem("onboardingComplete", "true")
     localStorage.setItem("userName", name)
     localStorage.setItem("theme", selectedTheme)
+    
+    // Save to Firebase if user is authenticated
+    if (user?.uid) {
+      try {
+        await updateUserPreferences(user.uid, {
+          userName: name,
+          theme: selectedTheme,
+        })
+      } catch (error) {
+        console.error("Error saving onboarding data to Firebase:", error)
+      }
+    }
+    
     onComplete()
   }
 
   return (
-    <div className="min-h-screen wavy-gradient-bg relative overflow-hidden">
+    <div className="min-h-screen wavy-gradient-bg relative overflow-hidden onboarding">
       {/* Animated gradient overlay */}
       <div className="absolute inset-0 wavy-animated opacity-40" />
 
-      <div className="relative z-10 min-h-screen flex items-center justify-center p-4">
+      <div className="relative z-10 min-h-screen flex items-center justify-center p-3 sm:p-4">
         <div className="w-full max-w-lg">
           {/* Step 0: Welcome */}
           {step === 0 && (
@@ -250,38 +339,112 @@ export function Onboarding({ onComplete }: OnboardingProps) {
               </div>
 
               <Card className="p-8 bg-card/80 backdrop-blur-xl border-2 shadow-2xl space-y-6">
-                <div className="aspect-square rounded-2xl bg-gradient-to-br from-secondary to-muted flex items-center justify-center border-4 heatwave-border overflow-hidden">
-                  {avatarCreated ? (
-                    <div className="text-center space-y-4 p-6">
-                      <div className="text-6xl animate-bounce">✓</div>
-                      <p className="text-lg font-bold heatwave-text">Avatar Created!</p>
-                      <p className="text-sm text-muted-foreground">Your 3D character is ready</p>
+                {showSuccess ? (
+                  // Success state with save button
+                  <div className="space-y-6">
+                    <div className="aspect-square rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center border-4 heatwave-border overflow-hidden">
+                      <div className="text-center space-y-4 p-6">
+                        <div className="text-6xl animate-bounce">✓</div>
+                        <p className="text-2xl font-black heatwave-text">Avatar Created!</p>
+                        <p className="text-sm text-muted-foreground font-medium">Your 3D character is ready</p>
+                      </div>
                     </div>
-                  ) : (
-                    <div className="text-center space-y-4 p-6">
-                      <Sparkles className="h-16 w-16 heatwave-text mx-auto" />
-                      <p className="text-lg font-bold">No Avatar Yet</p>
-                      <p className="text-sm text-muted-foreground">Create your 3D character with Ready Player Me</p>
+                    
+                    <div className="space-y-4">
+                      <Button
+                        type="button"
+                        size="lg"
+                        className="w-full h-14 gap-2 font-bold heatwave-gradient border-0 text-white hover:opacity-90 shadow-xl"
+                        onClick={async () => {
+                          if (!avatarUrl) return
+                          
+                          setSaving(true)
+                          try {
+                            // Save to Firebase if user is authenticated
+                            if (user?.uid) {
+                              await saveAvatar(user.uid, avatarUrl)
+                              console.log("Avatar saved to Firebase")
+                            }
+                            setShowSuccess(false)
+                            setStep(4) // Proceed to next step
+                          } catch (error) {
+                            console.error("Error saving avatar to Firebase:", error)
+                            // Still proceed even if Firebase save fails
+                            setShowSuccess(false)
+                            setStep(4)
+                          } finally {
+                            setSaving(false)
+                          }
+                        }}
+                        disabled={saving}
+                      >
+                        {saving ? (
+                          <>
+                            <Sparkles className="h-5 w-5 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="h-5 w-5" />
+                            Save & Continue
+                          </>
+                        )}
+                      </Button>
+                      
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="lg"
+                        className="w-full h-12 font-semibold"
+                        onClick={() => {
+                          setShowSuccess(false)
+                          setShowAvatarCreator(true)
+                        }}
+                        disabled={saving}
+                      >
+                        Create Another
+                      </Button>
                     </div>
-                  )}
-                </div>
+                  </div>
+                ) : (
+                  // Default state
+                  <>
+                    <div className="aspect-square rounded-2xl bg-gradient-to-br from-secondary to-muted flex items-center justify-center border-4 heatwave-border overflow-hidden">
+                      {avatarCreated && avatarUrl ? (
+                        <div className="text-center space-y-4 p-6">
+                          <div className="text-6xl">✓</div>
+                          <p className="text-lg font-bold heatwave-text">Avatar Created!</p>
+                          <p className="text-sm text-muted-foreground">Your 3D character is ready</p>
+                        </div>
+                      ) : (
+                        <div className="text-center space-y-4 p-6">
+                          <Sparkles className="h-16 w-16 heatwave-text mx-auto" />
+                          <p className="text-lg font-bold">No Avatar Yet</p>
+                          <p className="text-sm text-muted-foreground">Create your 3D character with Ready Player Me</p>
+                        </div>
+                      )}
+                    </div>
 
-                <Button
-                  type="button"
-                  size="lg"
-                  className="w-full h-14 gap-2 font-bold heatwave-gradient border-0 text-white hover:opacity-90"
-                  onClick={() => setShowAvatarCreator(true)}
-                  disabled={avatarCreated}
-                >
-                  <Sparkles className="h-5 w-5" />
-                  {avatarCreated ? "Avatar Created ✓" : "Create 3D Avatar"}
-                </Button>
+                    <Button
+                      type="button"
+                      size="lg"
+                      className="w-full h-14 gap-2 font-bold heatwave-gradient border-0 text-white hover:opacity-90"
+                      onClick={() => setShowAvatarCreator(true)}
+                      disabled={avatarCreated && !showSuccess}
+                    >
+                      <Sparkles className="h-5 w-5" />
+                      {avatarCreated ? "Avatar Created ✓" : "Create 3D Avatar"}
+                    </Button>
+                  </>
+                )}
 
-                <div className="p-4 rounded-xl bg-secondary/50 border-2">
-                  <p className="text-xs text-muted-foreground text-center font-medium">
-                    Your avatar will react with different emotes based on your loan activity and progress!
-                  </p>
-                </div>
+                {!showSuccess && (
+                  <div className="p-4 rounded-xl bg-secondary/50 border-2">
+                    <p className="text-xs text-muted-foreground text-center font-medium">
+                      Your avatar will react with different emotes based on your loan activity and progress!
+                    </p>
+                  </div>
+                )}
               </Card>
 
               <div className="flex gap-3">
@@ -378,9 +541,37 @@ export function Onboarding({ onComplete }: OnboardingProps) {
       </div>
 
       {showAvatarCreator && (
-        <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center">
-          <div className="relative w-full h-full md:w-[90vw] md:h-[85vh] md:max-w-3xl md:rounded-2xl bg-background overflow-hidden shadow-2xl border-0 md:border-4 heatwave-border flex flex-col">
-            <div className="absolute top-0 left-0 right-0 z-20 p-4 bg-gradient-to-b from-background via-background to-transparent pointer-events-none">
+        <div 
+          className="fixed inset-0 z-50 bg-black/95 backdrop-blur-sm"
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            width: '100vw',
+            height: '100vh',
+            maxWidth: '100vw',
+            maxHeight: '100vh',
+            overflow: 'hidden',
+          }}
+          onClick={(e) => {
+            // Close on backdrop click (but not on iframe)
+            if (e.target === e.currentTarget) {
+              setShowAvatarCreator(false)
+            }
+          }}
+        >
+          {/* Mobile: Full screen, Desktop: Centered modal */}
+          <div 
+            className="relative bg-background overflow-hidden shadow-2xl flex flex-col h-full w-full md:h-[85vh] md:w-[90vw] md:max-w-4xl md:rounded-2xl md:m-auto md:border-4 heatwave-border"
+            style={{
+              height: '100%',
+              width: '100%',
+            }}
+          >
+            {/* Close button */}
+            <div className="absolute top-0 left-0 right-0 z-20 p-2 sm:p-3 md:p-4 bg-gradient-to-b from-background via-background/95 to-transparent pointer-events-none">
               <Button
                 size="sm"
                 variant="ghost"
@@ -388,15 +579,37 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                 onClick={() => setShowAvatarCreator(false)}
               >
                 <X className="h-4 w-4" />
-                Close
+                <span className="hidden sm:inline">Close</span>
               </Button>
             </div>
 
-            <iframe
-              src={`https://demo.readyplayer.me/avatar?frameApi&clearCache`}
-              className="w-full h-full"
-              allow="camera *; microphone *"
-            />
+            {/* Iframe container - takes full remaining space */}
+            <div 
+              className="flex-1 relative w-full h-full"
+              style={{
+                flex: '1 1 auto',
+                minHeight: 0,
+                width: '100%',
+                height: '100%',
+              }}
+            >
+              <iframe
+                src={`https://demo.readyplayer.me/avatar?frameApi&clearCache`}
+                className="border-0 w-full h-full"
+                allow="camera *; microphone *"
+                style={{ 
+                  width: '100%',
+                  height: '100%',
+                  border: 'none',
+                  display: 'block',
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                }}
+              />
+            </div>
           </div>
         </div>
       )}
