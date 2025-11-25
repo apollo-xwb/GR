@@ -1,5 +1,6 @@
 import type React from "react"
 import type { Metadata } from "next"
+import localFont from "next/font/local"
 import { Space_Grotesk, Outfit } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import "./globals.css"
@@ -25,6 +26,67 @@ if (typeof window === "undefined") {
   }
 }
 
+// Power Grotesk Font - Primary font for headings
+// Using actual file names: Regular, Medium, Large (as SemiBold), Small (as Bold)
+const powerGrotesk = localFont({
+  src: [
+    {
+      path: "../fonts/PowerGrotesk-Regular.woff2",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "../fonts/PowerGrotesk-Medium.woff2",
+      weight: "500",
+      style: "normal",
+    },
+    {
+      path: "../fonts/PowerGrotesk-Large.woff2",
+      weight: "600",
+      style: "normal",
+    },
+    {
+      path: "../fonts/PowerGrotesk-Small.woff2",
+      weight: "700",
+      style: "normal",
+    },
+  ],
+  variable: "--font-power-grotesk",
+  display: "swap",
+  fallback: ["Space Grotesk", "system-ui", "sans-serif"],
+})
+
+// BaseNeue Font - UI elements font
+// Using actual file names with "Trial" suffix
+const baseNeue = localFont({
+  src: [
+    {
+      path: "../fonts/BaseNeueTrial-Regular.woff2",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "../fonts/BaseNeueTrial-Medium.woff2",
+      weight: "500",
+      style: "normal",
+    },
+    {
+      path: "../fonts/BaseNeueTrial-SemiBold.woff2",
+      weight: "600",
+      style: "normal",
+    },
+    {
+      path: "../fonts/BaseNeueTrial-Bold.woff2",
+      weight: "700",
+      style: "normal",
+    },
+  ],
+  variable: "--font-base-neue",
+  display: "swap",
+  fallback: ["Space Grotesk", "system-ui", "sans-serif"],
+})
+
+// Fallback fonts
 const spaceGrotesk = Space_Grotesk({
   subsets: ["latin"],
   variable: "--font-space-grotesk",
@@ -67,7 +129,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark">
-      <body className={`${outfit.variable} ${spaceGrotesk.variable} font-sans antialiased`}>
+      <body className={`${powerGrotesk.variable} ${baseNeue.variable} ${outfit.variable} ${spaceGrotesk.variable} font-sans antialiased`}>
         {children}
         <Analytics />
       </body>

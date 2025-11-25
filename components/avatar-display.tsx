@@ -5,6 +5,8 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Sparkles, Settings, Loader2, X } from "lucide-react"
+import { useAuth } from "@/contexts/auth-context"
+import { saveAvatar } from "@/lib/firebase/users"
 
 interface AvatarDisplayProps {
   tier: string
@@ -23,15 +25,20 @@ export function AvatarDisplay({
   activeLoan = false,
   compact = false,
 }: AvatarDisplayProps) {
+  const { user, userProfile, refreshProfile } = useAuth()
   const [avatarUrl, setAvatarUrl] = useState<string>("")
   const [isLoading, setIsLoading] = useState(true)
   const [showAvatarCreator, setShowAvatarCreator] = useState(false)
 
   useEffect(() => {
     const loadAvatar = () => {
-      const savedAvatar = localStorage.getItem("readyPlayerMeAvatar")
-      if (savedAvatar) {
-        setAvatarUrl(savedAvatar)
+      // Priority: Firebase userProfile > localStorage
+      const firebaseAvatar = userProfile?.readyPlayerMeAvatar || userProfile?.avatarUrl
+      const localAvatar = localStorage.getItem("readyPlayerMeAvatar")
+      const avatar = firebaseAvatar || localAvatar || ""
+      
+      if (avatar) {
+        setAvatarUrl(avatar)
       }
       setIsLoading(false)
     }
@@ -45,17 +52,32 @@ export function AvatarDisplay({
 
     window.addEventListener("storage", handleStorageChange)
     return () => window.removeEventListener("storage", handleStorageChange)
-  }, [])
+  }, [userProfile])
 
   useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
+    const handleMessage = async (event: MessageEvent) => {
       if (event.data?.source === "readyplayerme") {
         if (event.data.eventName === "v1.avatar.exported") {
-          const avatarUrl = event.data.data.url
-          console.log("[v0] Avatar created:", avatarUrl)
-          setAvatarUrl(avatarUrl)
-          localStorage.setItem("readyPlayerMeAvatar", avatarUrl)
+          const newAvatarUrl = event.data.data.url
+          console.log("[AvatarDisplay] Avatar created:", newAvatarUrl)
+          setAvatarUrl(newAvatarUrl)
+          localStorage.setItem("readyPlayerMeAvatar", newAvatarUrl)
           setShowAvatarCreator(false)
+          
+          // Save to Firebase if user is authenticated
+          if (user?.uid) {
+            try {
+              await saveAvatar(user.uid, newAvatarUrl)
+              console.log("[AvatarDisplay] Avatar saved to Firebase")
+              // Refresh profile to update UI
+              if (refreshProfile) {
+                await refreshProfile()
+              }
+            } catch (error) {
+              console.error("[AvatarDisplay] Error saving avatar to Firebase:", error)
+            }
+          }
+          
           window.dispatchEvent(new Event("storage"))
         }
       }
@@ -63,7 +85,7 @@ export function AvatarDisplay({
 
     window.addEventListener("message", handleMessage)
     return () => window.removeEventListener("message", handleMessage)
-  }, [])
+  }, [user, refreshProfile])
 
   const getTierGlow = () => {
     switch (tier.toLowerCase()) {
@@ -146,17 +168,21 @@ export function AvatarDisplay({
         </div>
 
         {showAvatarCreator && (
-          <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center">
+          <div className="fixed inset-0 z-[9999] bg-black/90 backdrop-blur-sm flex items-center justify-center">
             <div className="relative w-full h-full md:w-[90vw] md:h-[85vh] md:max-w-3xl md:rounded-2xl bg-background overflow-hidden shadow-2xl border-0 md:border-4 heatwave-border flex flex-col">
-              <div className="absolute top-0 left-0 right-0 z-20 p-4 bg-gradient-to-b from-background via-background to-transparent pointer-events-none">
+              {/* Close button - Small, positioned in corner to avoid Ready Player Me buttons */}
+              <div className="absolute top-2 right-2 sm:top-3 sm:right-3 z-[100] pointer-events-none">
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="ml-auto bg-background/95 backdrop-blur-sm font-bold shadow-lg pointer-events-auto flex items-center gap-2"
-                  onClick={() => setShowAvatarCreator(false)}
+                  className="bg-background/90 backdrop-blur-sm font-bold shadow-lg pointer-events-auto flex items-center gap-1 sm:gap-2 h-8 w-8 sm:h-auto sm:w-auto sm:px-3 rounded-full sm:rounded-lg hover:bg-background/95"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setShowAvatarCreator(false)
+                  }}
                 >
                   <X className="h-4 w-4" />
-                  Close
+                  <span className="hidden sm:inline text-xs">Close</span>
                 </Button>
               </div>
 
@@ -241,17 +267,21 @@ export function AvatarDisplay({
       </Card>
 
       {showAvatarCreator && (
-        <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center">
+        <div className="fixed inset-0 z-[9999] bg-black/90 backdrop-blur-sm flex items-center justify-center">
           <div className="relative w-full h-full md:w-[90vw] md:h-[85vh] md:max-w-3xl md:rounded-2xl bg-background overflow-hidden shadow-2xl border-0 md:border-4 heatwave-border flex flex-col">
-            <div className="absolute top-0 left-0 right-0 z-20 p-4 bg-gradient-to-b from-background via-background to-transparent pointer-events-none">
+            {/* Close button - Small, positioned in corner to avoid Ready Player Me buttons */}
+            <div className="absolute top-2 right-2 sm:top-3 sm:right-3 z-[100] pointer-events-none">
               <Button
                 size="sm"
                 variant="ghost"
-                className="ml-auto bg-background/95 backdrop-blur-sm font-bold shadow-lg pointer-events-auto flex items-center gap-2"
-                onClick={() => setShowAvatarCreator(false)}
+                className="bg-background/90 backdrop-blur-sm font-bold shadow-lg pointer-events-auto flex items-center gap-1 sm:gap-2 h-8 w-8 sm:h-auto sm:w-auto sm:px-3 rounded-full sm:rounded-lg hover:bg-background/95"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setShowAvatarCreator(false)
+                }}
               >
                 <X className="h-4 w-4" />
-                Close
+                <span className="hidden sm:inline text-xs">Close</span>
               </Button>
             </div>
 

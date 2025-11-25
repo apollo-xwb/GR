@@ -9,7 +9,7 @@ import {
   updateProfile,
 } from "firebase/auth"
 import { auth } from "./config"
-import { doc, setDoc, getDoc } from "firebase/firestore"
+import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore"
 import { db } from "./config"
 
 if (!auth) {
@@ -105,13 +105,24 @@ export const getCurrentUser = (): User | null => {
 // Listen to auth state changes
 export const onAuthStateChange = (callback: (user: User | null) => void) => {
   if (!auth) {
-    console.warn("Firebase Auth not initialized - calling callback with null")
+    console.warn("Firebase Auth not initialized - calling callback with null immediately")
     // Call callback immediately with null if auth isn't initialized
-    callback(null)
+    // Use setTimeout to ensure it's async
+    setTimeout(() => callback(null), 0)
     return () => {}
   }
   
   try {
+    // Call callback immediately with current user if available
+    const currentUser = auth.currentUser
+    if (currentUser) {
+      console.log("onAuthStateChange: Current user found, calling callback immediately:", currentUser.uid)
+      setTimeout(() => callback(currentUser), 0)
+    } else {
+      console.log("onAuthStateChange: No current user, will wait for auth state change")
+      setTimeout(() => callback(null), 0)
+    }
+    
     return onAuthStateChanged(auth, (user) => {
       console.log("onAuthStateChanged fired:", user?.uid || "null")
       callback(user)
@@ -135,8 +146,8 @@ const createUserDocument = async (uid: string, userData: Partial<UserData>) => {
     email: userData.email || null,
     displayName: userData.displayName || null,
     photoURL: userData.photoURL || null,
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
     // Game-specific fields
     userName: userData.displayName || "Player",
     avatarUrl: userData.photoURL || null,
@@ -152,6 +163,12 @@ const createUserDocument = async (uid: string, userData: Partial<UserData>) => {
     activeLoan: false,
   }
   
-  await setDoc(doc(db, "users", uid), userDoc, { merge: true })
+  try {
+    // Use setDoc with merge to create collection/document automatically
+    await setDoc(doc(db, "users", uid), userDoc, { merge: true })
+    console.log("✅ User document created in Firestore (collection created automatically if needed)")
+  } catch (error) {
+    console.error("Error creating user document:", error)
+  }
 }
 
