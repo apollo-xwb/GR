@@ -1,0 +1,261 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  /* Light mode colors - white background with dark text */
+  --background: oklch(0.98 0 0); /* White */
+  --foreground: oklch(0.15 0 0); /* Dark gray text */
+
+  --card: oklch(1 0 0); /* Pure white cards */
+  --card-foreground: oklch(0.15 0 0);
+
+  /* Gradient theme colors - users can switch between these */
+  --gradient-1: #ff6b35; /* Sunset Orange */
+  --gradient-2: #f7931e; /* Bright Orange */
+  --gradient-3: #e94823; /* Hot Coral */
+
+  --primary: oklch(0.65 0.22 35); /* Orange from palette */
+  --primary-foreground: oklch(0.98 0 0);
+
+  --secondary: oklch(0.95 0 0); /* Light gray */
+  --secondary-foreground: oklch(0.15 0 0);
+
+  --muted: oklch(0.92 0 0);
+  --muted-foreground: oklch(0.45 0 0);
+
+  --accent: oklch(0.75 0.25 40); /* Warm accent */
+  --accent-foreground: oklch(0.98 0 0);
+
+  --destructive: oklch(0.6 0.2 25);
+  --destructive-foreground: oklch(0.98 0 0);
+
+  --border: oklch(0.88 0 0); /* Lighter border for light mode */
+  --input: oklch(0.95 0 0);
+  --ring: oklch(0.65 0.22 35);
+
+  --radius: 1.25rem;
+
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.15 0 0);
+
+  --chart-1: oklch(0.65 0.22 35);
+  --chart-2: oklch(0.7 0.2 50);
+  --chart-3: oklch(0.6 0.18 25);
+  --chart-4: oklch(0.75 0.25 40);
+  --chart-5: oklch(0.68 0.2 45);
+
+  --sidebar: oklch(1 0 0);
+  --sidebar-foreground: oklch(0.15 0 0);
+  --sidebar-primary: oklch(0.65 0.22 35);
+  --sidebar-primary-foreground: oklch(0.98 0 0);
+  --sidebar-accent: oklch(0.95 0 0);
+  --sidebar-accent-foreground: oklch(0.45 0 0);
+  --sidebar-border: oklch(0.88 0 0);
+  --sidebar-ring: oklch(0.65 0.22 35);
+}
+
+/* Dark mode colors - black background with light text */
+.dark {
+  --background: oklch(0.08 0 0); /* Black */
+  --foreground: oklch(0.98 0 0); /* White text */
+
+  --card: oklch(0.12 0 0); /* Dark gray cards */
+  --card-foreground: oklch(0.98 0 0);
+
+  --secondary: oklch(0.18 0 0);
+  --secondary-foreground: oklch(0.98 0 0);
+
+  --muted: oklch(0.16 0 0);
+  --muted-foreground: oklch(0.55 0 0);
+
+  --border: oklch(0.22 0 0);
+  --input: oklch(0.18 0 0);
+
+  --popover: oklch(0.12 0 0);
+  --popover-foreground: oklch(0.98 0 0);
+
+  --sidebar: oklch(0.12 0 0);
+  --sidebar-foreground: oklch(0.98 0 0);
+  --sidebar-accent: oklch(0.16 0 0);
+  --sidebar-accent-foreground: oklch(0.55 0 0);
+  --sidebar-border: oklch(0.22 0 0);
+}
+
+/* Theme variants - Heatwave gradients in different colors */
+.theme-sunset {
+  --gradient-1: #ff6b35;
+  --gradient-2: #f7931e;
+  --gradient-3: #e94823;
+  --primary: oklch(0.65 0.22 35);
+  --accent: oklch(0.75 0.25 40);
+}
+
+.theme-ocean {
+  --gradient-1: #00d9ff;
+  --gradient-2: #00a8cc;
+  --gradient-3: #0891b2;
+  --primary: oklch(0.65 0.18 195);
+  --accent: oklch(0.7 0.2 210);
+}
+
+.theme-aurora {
+  --gradient-1: #a78bfa;
+  --gradient-2: #8b5cf6;
+  --gradient-3: #7c3aed;
+  --primary: oklch(0.65 0.2 280);
+  --accent: oklch(0.7 0.22 290);
+}
+
+.theme-forest {
+  --gradient-1: #34d399;
+  --gradient-2: #10b981;
+  --gradient-3: #059669;
+  --primary: oklch(0.65 0.18 155);
+  --accent: oklch(0.7 0.2 165);
+}
+
+.theme-neon {
+  --gradient-1: #f472b6;
+  --gradient-2: #ec4899;
+  --gradient-3: #db2777;
+  --primary: oklch(0.65 0.22 340);
+  --accent: oklch(0.7 0.25 350);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Updated font families to Space Grotesk and Outfit for bold, modern look */
+  --font-sans: "Space Grotesk", "Space Grotesk Fallback", system-ui, sans-serif;
+  --font-mono: "Outfit", "Outfit Fallback", monospace;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Heatwave gradient utilities */
+/* Added wavy heatwave gradient background utilities */
+@layer utilities {
+  /* Add scrollbar hide utility for horizontal scrolling */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Full wavy gradient backgrounds for the entire app */
+  .wavy-gradient-bg {
+    background: radial-gradient(ellipse 80% 50% at 120% -10%, var(--gradient-1), transparent),
+      radial-gradient(ellipse 60% 80% at -20% 50%, var(--gradient-2), transparent),
+      radial-gradient(ellipse 100% 70% at 50% 120%, var(--gradient-3), transparent),
+      linear-gradient(180deg, var(--background) 0%, var(--background) 100%);
+    background-attachment: fixed;
+  }
+
+  /* Wavy gradient overlay for cards */
+  .wavy-gradient-overlay {
+    background: radial-gradient(
+        ellipse 150% 80% at 50% 0%,
+        color-mix(in oklch, var(--gradient-1), transparent 40%),
+        transparent 60%
+      ),
+      radial-gradient(
+        ellipse 120% 90% at 0% 100%,
+        color-mix(in oklch, var(--gradient-2), transparent 50%),
+        transparent 70%
+      ),
+      radial-gradient(
+        ellipse 130% 85% at 100% 50%,
+        color-mix(in oklch, var(--gradient-3), transparent 60%),
+        transparent 75%
+      );
+  }
+
+  .heatwave-gradient {
+    background: linear-gradient(135deg, var(--gradient-1) 0%, var(--gradient-2) 50%, var(--gradient-3) 100%);
+  }
+
+  .heatwave-gradient-soft {
+    background: linear-gradient(
+      135deg,
+      color-mix(in oklch, var(--gradient-1), transparent 70%) 0%,
+      color-mix(in oklch, var(--gradient-2), transparent 80%) 50%,
+      color-mix(in oklch, var(--gradient-3), transparent 85%) 100%
+    );
+  }
+
+  .heatwave-border {
+    border-image: linear-gradient(135deg, var(--gradient-1), var(--gradient-2), var(--gradient-3)) 1;
+  }
+
+  .heatwave-text {
+    background: linear-gradient(135deg, var(--gradient-1), var(--gradient-2), var(--gradient-3));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  /* Animated wavy gradient */
+  .wavy-animated {
+    background: radial-gradient(ellipse 80% 50% at 50% -20%, var(--gradient-1), transparent),
+      radial-gradient(ellipse 60% 80% at -20% 50%, var(--gradient-2), transparent),
+      radial-gradient(ellipse 100% 70% at 50% 120%, var(--gradient-3), transparent);
+    background-size: 200% 200%;
+    animation: wave-flow 15s ease-in-out infinite;
+  }
+
+  @keyframes wave-flow {
+    0%,
+    100% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+  }
+}
