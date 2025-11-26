@@ -1,6 +1,11 @@
-import { doc, getDoc, setDoc, updateDoc, serverTimestamp, Timestamp } from "firebase/firestore"
+import { doc, getDoc, setDoc, updateDoc, serverTimestamp, arrayUnion } from "firebase/firestore"
 import { db } from "./config"
 import { User } from "firebase/auth"
+
+export interface AvatarRecord {
+  url: string
+  savedAt: Date
+}
 
 export interface UserProfile {
   uid: string
@@ -10,6 +15,7 @@ export interface UserProfile {
   userName: string
   avatarUrl: string | null
   readyPlayerMeAvatar: string | null
+  readyPlayerMeAvatars?: AvatarRecord[]
   selectedTemplate?: string // Track which template was selected
   theme: string
   darkMode: boolean
@@ -35,8 +41,22 @@ export const getUserProfile = async (uid: string): Promise<UserProfile | null> =
     const userDoc = await getDoc(doc(db, "users", uid))
     if (userDoc.exists()) {
       const data = userDoc.data()
+      const readyPlayerMeAvatars = Array.isArray(data.readyPlayerMeAvatars)
+        ? data.readyPlayerMeAvatars
+            .map((entry: any) => ({
+            url: entry?.url,
+            savedAt: entry?.savedAt?.toDate
+              ? entry.savedAt.toDate()
+              : entry?.savedAt
+              ? new Date(entry.savedAt)
+              : new Date(),
+          }))
+            .sort((a, b) => b.savedAt.getTime() - a.savedAt.getTime())
+        : []
+
       return {
         ...data,
+        readyPlayerMeAvatars,
         createdAt: data.createdAt?.toDate() || new Date(),
         updatedAt: data.updatedAt?.toDate() || new Date(),
       } as UserProfile
@@ -48,7 +68,7 @@ export const getUserProfile = async (uid: string): Promise<UserProfile | null> =
   }
 }
 
-// Update user profile - automatically creates document/collection if it doesn't exist
+// Update user profile
 export const updateUserProfile = async (uid: string, updates: Partial<UserProfile>) => {
   if (!db) {
     throw new Error("Firestore not initialized")
@@ -56,97 +76,63 @@ export const updateUserProfile = async (uid: string, updates: Partial<UserProfil
   
   try {
     const userRef = doc(db, "users", uid)
-    const userDoc = await getDoc(userRef)
-    const now = serverTimestamp()
-    
-    if (userDoc.exists()) {
-      // Document exists, update it
-      await updateDoc(userRef, {
-        ...updates,
-        updatedAt: now,
-      })
-    } else {
-      // Document doesn't exist, create it with merge
-      await setDoc(userRef, {
-        uid: uid,
-        userName: "Player",
-        theme: "sunset",
-        darkMode: true,
-        xp: 0,
-        tier: "Bronze",
-        balance: 0,
-        swopBalance: 0,
-        loanLimit: 500,
-        completedLoans: 0,
-        activeLoan: false,
-        createdAt: now,
-        ...updates,
-        updatedAt: now,
-      }, { merge: true })
-    }
+    await updateDoc(userRef, {
+      ...updates,
+      updatedAt: serverTimestamp(),
+    })
   } catch (error) {
     console.error("Error updating user profile:", error)
     throw error
   }
 }
 
-// Save avatar URL - automatically creates document/collection if it doesn't exist
+// Save avatar URL
 export const saveAvatar = async (uid: string, avatarUrl: string) => {
   if (!db) {
     throw new Error("Firestore not initialized")
   }
-  
-  console.log("[Firebase] 🎨 Saving avatar to Firestore...")
-  console.log("[Firebase] 📍 Collection: users (will be created automatically if needed)")
-  console.log("[Firebase] 📍 Document ID:", uid)
-  console.log("[Firebase] 📍 Avatar URL:", avatarUrl)
-  
+
   try {
     const userRef = doc(db, "users", uid)
-    
-    // Check if document exists
-    const userDoc = await getDoc(userRef)
-    const now = serverTimestamp()
-    
-    if (userDoc.exists()) {
-      // Document exists, update it
-      console.log("[Firebase] 📝 Document exists, updating...")
-      await updateDoc(userRef, {
-        readyPlayerMeAvatar: avatarUrl,
-        avatarUrl: avatarUrl,
-        updatedAt: now,
-      })
-    } else {
-      // Document doesn't exist, create it with merge
-      console.log("[Firebase] 📝 Document doesn't exist, creating with merge...")
-      await setDoc(userRef, {
-        uid: uid,
-        readyPlayerMeAvatar: avatarUrl,
-        avatarUrl: avatarUrl,
-        userName: "Player",
-        theme: "sunset",
-        darkMode: true,
-        xp: 0,
-        tier: "Bronze",
-        balance: 0,
-        swopBalance: 0,
-        loanLimit: 500,
-        completedLoans: 0,
-        activeLoan: false,
-        createdAt: now,
-        updatedAt: now,
-      }, { merge: true })
+    const avatarEntry = {
+      url: avatarUrl,
+      savedAt: new Date(),
     }
-    
-    console.log("[Firebase] ✅ Avatar saved successfully!")
-    console.log("[Firebase] 📊 Document: users/" + uid)
-    console.log("[Firebase] 🔍 Fields: readyPlayerMeAvatar, avatarUrl, updatedAt")
-    
-    return { success: true }
-  } catch (error: any) {
-    console.error("[Firebase] ❌ Error saving avatar:", error)
-    console.error("[Firebase] 📋 Error code:", error.code)
-    console.error("[Firebase] 📋 Error message:", error.message)
+
+    await setDoc(
+      userRef,
+      {
+        readyPlayerMeAvatar: avatarUrl,
+        avatarUrl: avatarUrl,
+        readyPlayerMeAvatars: arrayUnion(avatarEntry),
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true },
+    )
+  } catch (error) {
+    console.error("Error saving avatar:", error)
+    throw error
+  }
+}
+
+export const setActiveAvatar = async (uid: string, avatarUrl: string) => {
+  if (!db) {
+    throw new Error("Firestore not initialized")
+  }
+
+  try {
+    const userRef = doc(db, "users", uid)
+    await setDoc(
+      userRef,
+      {
+        readyPlayerMeAvatar: avatarUrl,
+        avatarUrl: avatarUrl,
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true },
+    )
+  } catch (error) {
+    console.error("Error setting active avatar:", error)
     throw error
   }
 }

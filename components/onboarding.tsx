@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -8,7 +8,9 @@ import { Label } from "@/components/ui/label"
 import { Zap, Rocket, Shield, Trophy, Sparkles, ArrowRight, Wallet, Target, TrendingUp, X } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/contexts/auth-context"
-import { saveAvatar, updateUserPreferences, updateUserStats } from "@/lib/firebase/users"
+import { saveAvatar, updateUserPreferences, updateUserStats, setActiveAvatar } from "@/lib/firebase/users"
+import { toast } from "sonner"
+import { AvatarLibrary } from "@/components/avatar-library"
 
 interface OnboardingProps {
   onComplete: () => void
@@ -27,7 +29,22 @@ export function Onboarding({ onComplete }: OnboardingProps) {
   const [avatarPersisted, setAvatarPersisted] = useState(!!userProfile?.readyPlayerMeAvatar)
   const avatarCreatorRef = useRef<HTMLIFrameElement | null>(null)
   const readyPlayerMeSubdomain = process.env.NEXT_PUBLIC_READY_PLAYER_ME_SUBDOMAIN || "demo"
-  const readyPlayerMeUrl = `https://${readyPlayerMeSubdomain}.readyplayer.me/avatar?frameApi=1&clearCache=1&bodyType=fullbody`
+  const sanitizedSubdomain = useMemo(
+    () => readyPlayerMeSubdomain.replace(/^https?:\/\//, "").replace(/\.readyplayer\.me.*$/i, ""),
+    [readyPlayerMeSubdomain],
+  )
+  const readyPlayerMeUrl = useMemo(() => {
+    const params = new URLSearchParams({
+      frameApi: "1",
+      clearCache: "1",
+      bodyType: "fullbody",
+      quickStart: "false",
+      language: "en",
+    })
+    return `https://${sanitizedSubdomain}.readyplayer.me/avatar?${params.toString()}`
+  }, [sanitizedSubdomain])
+  const [showAvatarLibrary, setShowAvatarLibrary] = useState(false)
+  const avatarHistory = userProfile?.readyPlayerMeAvatars ?? []
   
   // Handle body scroll lock when modal is open
   useEffect(() => {
@@ -132,6 +149,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         setAvatarCreated(true)
         setShowAvatarCreator(false)
         setShowSuccess(true)
+        toast.success("Avatar saved! Finish onboarding or create another.")
 
         if (user?.uid) {
           setSaving(true)
@@ -140,6 +158,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
             setAvatarPersisted(true)
           } catch (error) {
             console.error("Error saving avatar to Firebase:", error)
+            toast.error("Failed to save avatar. Please try again.")
           } finally {
             setSaving(false)
           }
@@ -195,6 +214,27 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         await updateUserPreferences(user.uid, { theme: themeId })
       } catch (error) {
         console.error("Error saving theme to Firebase:", error)
+      }
+    }
+  }
+
+  const handleSelectExistingAvatar = async (existingUrl: string) => {
+    if (!existingUrl) return
+
+    setAvatarUrl(existingUrl)
+    setAvatarCreated(true)
+    setShowAvatarLibrary(false)
+    setShowSuccess(true)
+    localStorage.setItem("readyPlayerMeAvatar", existingUrl)
+    window.dispatchEvent(new Event("storage"))
+
+    if (user?.uid) {
+      try {
+        await setActiveAvatar(user.uid, existingUrl)
+        toast.success("Avatar updated")
+      } catch (error) {
+        console.error("Error setting avatar:", error)
+        toast.error("Unable to update avatar")
       }
     }
   }
@@ -460,6 +500,19 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                       >
                         Create Another
                       </Button>
+
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="lg"
+                        className="w-full h-12 font-semibold"
+                        onClick={() => {
+                          setShowSuccess(false)
+                          setShowAvatarLibrary(true)
+                        }}
+                      >
+                        Choose Existing Avatar
+                      </Button>
                     </div>
                   </div>
                 ) : (
@@ -488,10 +541,19 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                       size="lg"
                       className="w-full h-14 gap-2 font-bold heatwave-gradient border-0 text-white hover:opacity-90"
                       onClick={() => setShowAvatarCreator(true)}
-                      disabled={avatarCreated && !showSuccess}
                     >
                       <Sparkles className="h-5 w-5" />
-                      {avatarCreated ? "Avatar Created ✓" : "Create 3D Avatar"}
+                      {avatarCreated ? "Design Another Avatar" : "Create 3D Avatar"}
+                    </Button>
+
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="lg"
+                      className="w-full h-12 font-semibold"
+                      onClick={() => setShowAvatarLibrary(true)}
+                    >
+                      Browse Saved Avatars
                     </Button>
                   </>
                 )}
@@ -599,69 +661,61 @@ export function Onboarding({ onComplete }: OnboardingProps) {
       </div>
 
       {showAvatarCreator && (
-        <div 
+        <div
           className="fixed inset-0 z-50 bg-black/95 backdrop-blur-sm"
           style={{
-            position: 'fixed',
+            position: "fixed",
             top: 0,
             left: 0,
             right: 0,
             bottom: 0,
-            width: '100vw',
-            height: '100vh',
-            maxWidth: '100vw',
-            maxHeight: '100vh',
-            overflow: 'hidden',
+            width: "100vw",
+            height: "100vh",
+            maxWidth: "100vw",
+            maxHeight: "100vh",
+            overflow: "hidden",
           }}
           onClick={(e) => {
-            // Close on backdrop click (but not on iframe)
             if (e.target === e.currentTarget) {
               setShowAvatarCreator(false)
             }
           }}
         >
-          {/* Mobile: Full screen, Desktop: Centered modal */}
-          <div 
+          <div
             className="relative bg-background overflow-hidden shadow-2xl flex flex-col h-full w-full md:h-[85vh] md:w-[90vw] md:max-w-4xl md:rounded-2xl md:m-auto md:border-4 heatwave-border"
             style={{
-              height: '100%',
-              width: '100%',
+              height: "100%",
+              width: "100%",
             }}
           >
-            {/* Close button */}
-            <div className="absolute top-0 left-0 right-0 z-20 p-2 sm:p-3 md:p-4 bg-gradient-to-b from-background via-background/95 to-transparent pointer-events-none">
-              <Button
-                size="sm"
-                variant="ghost"
-                className="ml-auto bg-background/95 backdrop-blur-sm font-bold shadow-lg pointer-events-auto flex items-center gap-2"
-                onClick={() => setShowAvatarCreator(false)}
-              >
-                <X className="h-4 w-4" />
-                <span className="hidden sm:inline">Close</span>
-              </Button>
-            </div>
+            <button
+              className="absolute top-3 right-3 z-20 inline-flex items-center gap-1 rounded-full bg-black/60 text-white px-3 py-1 text-xs font-semibold shadow-lg sm:top-4 sm:right-4 sm:text-sm sm:px-4 sm:py-1.5"
+              onClick={() => setShowAvatarCreator(false)}
+            >
+              <X className="h-4 w-4" />
+              <span className="hidden sm:inline">Close</span>
+            </button>
 
-            {/* Iframe container - takes full remaining space */}
-            <div 
+            <div
               className="flex-1 relative w-full h-full"
               style={{
-                flex: '1 1 auto',
+                flex: "1 1 auto",
                 minHeight: 0,
-                width: '100%',
-                height: '100%',
+                width: "100%",
+                height: "100%",
               }}
             >
               <iframe
                 ref={avatarCreatorRef}
                 src={readyPlayerMeUrl}
                 className="border-0 w-full h-full"
-                allow="camera *; microphone *"
-                style={{ 
-                  width: '100%',
-                  height: '100%',
-                  border: 'none',
-                  display: 'block',
-                  position: 'absolute',
+                allow="camera *; microphone *; clipboard-write"
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  border: "none",
+                  display: "block",
+                  position: "absolute",
                   top: 0,
                   left: 0,
                   right: 0,
@@ -672,6 +726,18 @@ export function Onboarding({ onComplete }: OnboardingProps) {
           </div>
         </div>
       )}
+
+      <AvatarLibrary
+        open={showAvatarLibrary}
+        avatars={avatarHistory}
+        activeUrl={avatarUrl ?? undefined}
+        onSelect={handleSelectExistingAvatar}
+        onClose={() => setShowAvatarLibrary(false)}
+        allowCreateCallback={() => {
+          setShowAvatarLibrary(false)
+          setShowAvatarCreator(true)
+        }}
+      />
     </div>
   )
 }

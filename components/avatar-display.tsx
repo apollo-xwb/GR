@@ -1,12 +1,14 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useMemo } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Sparkles, Settings, Loader2, X } from "lucide-react"
+import { Sparkles, Settings, Loader2, X, Layers } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
-import { saveAvatar } from "@/lib/firebase/users"
+import { saveAvatar, setActiveAvatar } from "@/lib/firebase/users"
+import { toast } from "sonner"
+import { AvatarLibrary } from "@/components/avatar-library"
 
 interface AvatarDisplayProps {
   tier: string
@@ -25,13 +27,28 @@ export function AvatarDisplay({
   activeLoan = false,
   compact = false,
 }: AvatarDisplayProps) {
-  const { user } = useAuth()
+  const { user, userProfile } = useAuth()
   const [avatarUrl, setAvatarUrl] = useState<string>("")
   const [isLoading, setIsLoading] = useState(true)
   const [showAvatarCreator, setShowAvatarCreator] = useState(false)
+  const [showAvatarLibrary, setShowAvatarLibrary] = useState(false)
   const avatarCreatorRef = useRef<HTMLIFrameElement | null>(null)
   const readyPlayerMeSubdomain = process.env.NEXT_PUBLIC_READY_PLAYER_ME_SUBDOMAIN || "demo"
-  const readyPlayerMeUrl = `https://${readyPlayerMeSubdomain}.readyplayer.me/avatar?frameApi=1&clearCache=1&bodyType=fullbody`
+  const sanitizedSubdomain = useMemo(
+    () => readyPlayerMeSubdomain.replace(/^https?:\/\//, "").replace(/\.readyplayer\.me.*$/i, ""),
+    [readyPlayerMeSubdomain],
+  )
+  const readyPlayerMeUrl = useMemo(() => {
+    const params = new URLSearchParams({
+      frameApi: "1",
+      clearCache: "1",
+      bodyType: "fullbody",
+      quickStart: "false",
+      language: "en",
+    })
+    return `https://${sanitizedSubdomain}.readyplayer.me/avatar?${params.toString()}`
+  }, [sanitizedSubdomain])
+  const avatarHistory = userProfile?.readyPlayerMeAvatars ?? []
 
   useEffect(() => {
     const loadAvatar = () => {
@@ -52,6 +69,13 @@ export function AvatarDisplay({
     window.addEventListener("storage", handleStorageChange)
     return () => window.removeEventListener("storage", handleStorageChange)
   }, [])
+
+  useEffect(() => {
+    if (userProfile?.readyPlayerMeAvatar) {
+      setAvatarUrl(userProfile.readyPlayerMeAvatar)
+      localStorage.setItem("readyPlayerMeAvatar", userProfile.readyPlayerMeAvatar)
+    }
+  }, [userProfile?.readyPlayerMeAvatar])
 
   useEffect(() => {
     if (!showAvatarCreator) return
@@ -106,8 +130,10 @@ export function AvatarDisplay({
         if (user?.uid) {
           try {
             await saveAvatar(user.uid, newAvatarUrl)
+            toast.success("Avatar saved to your profile")
           } catch (error) {
             console.error("Error saving avatar to Firebase:", error)
+            toast.error("Failed to save avatar. Please try again.")
           }
         }
       }
@@ -153,6 +179,25 @@ export function AvatarDisplay({
     setShowAvatarCreator(true)
   }
 
+  const handleSelectExistingAvatar = async (url: string) => {
+    if (!user?.uid) {
+      toast.error("Please sign in to manage avatars")
+      return
+    }
+
+    try {
+      setAvatarUrl(url)
+      localStorage.setItem("readyPlayerMeAvatar", url)
+      window.dispatchEvent(new Event("storage"))
+      await setActiveAvatar(user.uid, url)
+      toast.success("Avatar updated")
+      setShowAvatarLibrary(false)
+    } catch (error) {
+      console.error("Error activating avatar:", error)
+      toast.error("Unable to update avatar")
+    }
+  }
+
   if (compact) {
     return (
       <>
@@ -191,32 +236,39 @@ export function AvatarDisplay({
             </p>
           </div>
 
-          <Button size="sm" variant="outline" className="gap-2 bg-transparent" onClick={openAvatarCreator}>
-            <Settings className="h-3 w-3" />
-            {avatarUrl ? "Edit" : "Create"}
-          </Button>
+          <div className="flex flex-col gap-2">
+            <Button size="sm" variant="outline" className="gap-2 bg-transparent" onClick={openAvatarCreator}>
+              <Settings className="h-3 w-3" />
+              {avatarUrl ? "Edit" : "Create"}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="gap-2 bg-transparent"
+              onClick={() => setShowAvatarLibrary(true)}
+            >
+              <Layers className="h-3 w-3" />
+              Manage
+            </Button>
+          </div>
         </div>
 
         {showAvatarCreator && (
           <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center">
             <div className="relative w-full h-full md:w-[90vw] md:h-[85vh] md:max-w-3xl md:rounded-2xl bg-background overflow-hidden shadow-2xl border-0 md:border-4 heatwave-border flex flex-col">
-              <div className="absolute top-0 left-0 right-0 z-20 p-4 bg-gradient-to-b from-background via-background to-transparent pointer-events-none">
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="ml-auto bg-background/95 backdrop-blur-sm font-bold shadow-lg pointer-events-auto flex items-center gap-2"
-                  onClick={() => setShowAvatarCreator(false)}
-                >
-                  <X className="h-4 w-4" />
-                  Close
-                </Button>
-              </div>
+              <button
+                className="absolute top-3 right-3 z-20 inline-flex items-center gap-1 rounded-full bg-black/60 text-white px-3 py-1 text-xs font-semibold shadow-lg"
+                onClick={() => setShowAvatarCreator(false)}
+              >
+                <X className="h-3.5 w-3.5" />
+                Close
+              </button>
 
               <iframe
                 ref={avatarCreatorRef}
                 src={readyPlayerMeUrl}
                 className="w-full h-full"
-                allow="camera *; microphone *"
+                allow="camera *; microphone *; clipboard-write"
               />
             </div>
           </div>
@@ -296,27 +348,32 @@ export function AvatarDisplay({
       {showAvatarCreator && (
         <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center">
           <div className="relative w-full h-full md:w-[90vw] md:h-[85vh] md:max-w-3xl md:rounded-2xl bg-background overflow-hidden shadow-2xl border-0 md:border-4 heatwave-border flex flex-col">
-            <div className="absolute top-0 left-0 right-0 z-20 p-4 bg-gradient-to-b from-background via-background to-transparent pointer-events-none">
-              <Button
-                size="sm"
-                variant="ghost"
-                className="ml-auto bg-background/95 backdrop-blur-sm font-bold shadow-lg pointer-events-auto flex items-center gap-2"
-                onClick={() => setShowAvatarCreator(false)}
-              >
-                <X className="h-4 w-4" />
-                Close
-              </Button>
-            </div>
+            <button
+              className="absolute top-4 right-4 z-20 inline-flex items-center gap-1 rounded-full bg-black/60 text-white px-4 py-1.5 text-sm font-semibold shadow-lg"
+              onClick={() => setShowAvatarCreator(false)}
+            >
+              <X className="h-4 w-4" />
+              Close
+            </button>
 
             <iframe
               ref={avatarCreatorRef}
               src={readyPlayerMeUrl}
               className="w-full h-full"
-              allow="camera *; microphone *"
+              allow="camera *; microphone *; clipboard-write"
             />
           </div>
         </div>
       )}
+
+      <AvatarLibrary
+        open={showAvatarLibrary}
+        avatars={avatarHistory}
+        activeUrl={avatarUrl}
+        onSelect={handleSelectExistingAvatar}
+        onClose={() => setShowAvatarLibrary(false)}
+        allowCreateCallback={openAvatarCreator}
+      />
     </>
   )
 }
