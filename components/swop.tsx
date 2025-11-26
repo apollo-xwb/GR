@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -12,7 +12,6 @@ import {
   CreditCard,
   Wallet,
   Search,
-  User,
   ArrowRightLeft,
   QrCode,
   History,
@@ -21,6 +20,7 @@ import {
   Check,
   X,
 } from "lucide-react"
+import { toast } from "sonner"
 
 export function Swop() {
   const [activeView, setActiveView] = useState<"send" | "receive" | "add" | "withdraw">("send")
@@ -28,6 +28,9 @@ export function Swop() {
   const [recipient, setRecipient] = useState("")
   const [balance] = useState(8700.46)
   const [cardBalance] = useState(2500.0)
+  const [showQrModal, setShowQrModal] = useState(false)
+  const [qrPayload, setQrPayload] = useState("")
+  const [qrPreview, setQrPreview] = useState<string | null>(null)
 
   const recentContacts = [
     { id: 1, name: "Alex Johnson", username: "@alexj", avatar: "👤" },
@@ -56,7 +59,45 @@ export function Swop() {
     console.log("Withdrawing", amount)
   }
 
+  useEffect(() => {
+    if (!showQrModal || typeof document === "undefined") return
+    const body = document.body
+    const current = Number(body.dataset.modalCount || "0") + 1
+    body.dataset.modalCount = `${current}`
+    body.classList.add("modal-open")
+    return () => {
+      const next = Math.max(0, Number(body.dataset.modalCount || "1") - 1)
+      if (next === 0) {
+        body.classList.remove("modal-open")
+        delete body.dataset.modalCount
+      } else {
+        body.dataset.modalCount = `${next}`
+      }
+    }
+  }, [showQrModal])
+
+  const handleQrFile = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => setQrPreview(reader.result as string)
+    reader.readAsDataURL(file)
+  }
+
+  const applyQrPayload = () => {
+    if (!qrPayload.trim()) {
+      toast.error("Paste a QR payload first")
+      return
+    }
+    const [target, qrAmount] = qrPayload.split("|").map((part) => part.trim())
+    if (target) setRecipient(target)
+    if (qrAmount) setAmount(qrAmount)
+    toast.success("QR payment details applied")
+    setShowQrModal(false)
+  }
+
   return (
+    <>
     <div className="min-h-screen p-3 sm:p-4 pb-24 max-w-2xl mx-auto space-y-4 sm:space-y-6">
       {/* Header */}
       <div className="text-center mb-4 sm:mb-6">
@@ -166,6 +207,16 @@ export function Swop() {
                 />
               </div>
             </div>
+
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full gap-2 font-semibold"
+              onClick={() => setShowQrModal(true)}
+            >
+              <QrCode className="h-5 w-5" />
+              Pay using QR Code
+            </Button>
 
             {/* Quick Amount Buttons */}
             <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
@@ -342,6 +393,52 @@ export function Swop() {
         </div>
       </Card>
     </div>
+
+      {showQrModal && (
+        <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4">
+          <Card className="w-full max-w-md bg-card/95 border-2 shadow-2xl space-y-4 p-6 relative">
+            <button
+              className="absolute top-3 right-3 rounded-full bg-black/40 text-white p-1"
+              onClick={() => setShowQrModal(false)}
+            >
+              <X className="h-4 w-4" />
+            </button>
+            <div className="space-y-2">
+              <h3 className="text-xl font-bold">Scan or Upload QR</h3>
+              <p className="text-sm text-muted-foreground">
+                Point your camera at a payment QR or paste the payload below. We'll pre-fill the recipient and amount.
+              </p>
+            </div>
+            <label className="flex flex-col items-center justify-center border-2 border-dashed border-border rounded-2xl p-6 cursor-pointer text-center gap-3 hover:border-primary transition">
+              <QrCode className="h-10 w-10 text-primary" />
+              <span className="text-sm font-semibold">Upload QR Image</span>
+              <input type="file" accept="image/*" className="hidden" onChange={handleQrFile} />
+            </label>
+            {qrPreview && (
+              <div className="rounded-2xl overflow-hidden border border-border">
+                <img src={qrPreview} alt="QR preview" className="w-full h-48 object-cover" />
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold">QR Payload</Label>
+              <textarea
+                rows={4}
+                className="w-full rounded-xl border border-border bg-background/70 p-3 text-sm"
+                placeholder="Example: @alexj|250"
+                value={qrPayload}
+                onChange={(e) => setQrPayload(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                We currently support payloads formatted as <strong>username|amount</strong>. Amount is optional.
+              </p>
+            </div>
+            <Button className="w-full heatwave-gradient border-0 text-white font-bold" onClick={applyQrPayload}>
+              Apply QR Details
+            </Button>
+          </Card>
+        </div>
+      )}
+    </>
   )
 }
 

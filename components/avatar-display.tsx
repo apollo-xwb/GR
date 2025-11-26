@@ -166,7 +166,6 @@ export function AvatarDisplay({
         setAvatarUrl(newAvatarUrl)
         localStorage.setItem("readyPlayerMeAvatar", newAvatarUrl)
         window.dispatchEvent(new Event("storage"))
-        setShowAvatarCreator(false)
 
         if (user?.uid) {
           try {

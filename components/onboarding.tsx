@@ -153,7 +153,6 @@ export function Onboarding({ onComplete }: OnboardingProps) {
 
         setAvatarUrl(newAvatarUrl)
         setAvatarCreated(true)
-        setShowAvatarCreator(false)
         setShowSuccess(true)
         toast.success("Avatar saved! Finish onboarding or create another.")
 
