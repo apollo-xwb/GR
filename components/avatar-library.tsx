@@ -5,12 +5,13 @@ import { X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import type { AvatarRecord } from "@/lib/firebase/users"
+import { getAvatarPreviewUrl } from "@/lib/firebase/users"
 
 interface AvatarLibraryProps {
   open: boolean
   avatars: AvatarRecord[]
   activeUrl?: string | null
-  onSelect: (url: string) => void
+  onSelect: (url: string, previewUrl?: string | null) => void
   onClose: () => void
   allowCreateCallback?: () => void
 }
@@ -58,14 +59,14 @@ export function AvatarLibrary({
               {avatars.map((avatar) => (
                 <button
                   key={`${avatar.url}-${avatar.savedAt.toString()}`}
-                  onClick={() => onSelect(avatar.url)}
+                  onClick={() => onSelect(avatar.url, avatar.previewUrl)}
                   className={`group relative rounded-2xl border ${
                     activeUrl === avatar.url ? "border-primary shadow-xl" : "border-border hover:border-primary"
                   } bg-card/80 backdrop-blur-md overflow-hidden text-left`}
                 >
                   <div className="aspect-square w-full overflow-hidden bg-secondary">
                     <img
-                      src={`${avatar.url}?scene=fullbody-portrait-v1&quality=medium`}
+                      src={avatar.previewUrl || getAvatarPreviewUrl(avatar.url)}
                       alt="Saved avatar"
                       className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                     />

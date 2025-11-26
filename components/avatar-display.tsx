@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Sparkles, Settings, Loader2, X, Layers } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
-import { saveAvatar, setActiveAvatar } from "@/lib/firebase/users"
+import { saveAvatar, setActiveAvatar, getAvatarPreviewUrl } from "@/lib/firebase/users"
 import { toast } from "sonner"
 import { AvatarLibrary } from "@/components/avatar-library"
 
@@ -31,6 +31,7 @@ export function AvatarDisplay({
 }: AvatarDisplayProps) {
   const { user, userProfile, refreshProfile } = useAuth()
   const [avatarUrl, setAvatarUrl] = useState<string>("")
+  const [avatarPreview, setAvatarPreview] = useState<string>("")
   const [isLoading, setIsLoading] = useState(true)
   const [showAvatarCreator, setShowAvatarCreator] = useState(false)
   const [showAvatarLibrary, setShowAvatarLibrary] = useState(false)
@@ -55,8 +56,12 @@ export function AvatarDisplay({
   useEffect(() => {
     const loadAvatar = () => {
       const savedAvatar = localStorage.getItem("readyPlayerMeAvatar")
+      const savedPreview = localStorage.getItem("readyPlayerMeAvatarPreview")
       if (savedAvatar) {
         setAvatarUrl(savedAvatar)
+      }
+      if (savedPreview) {
+        setAvatarPreview(savedPreview)
       }
       setIsLoading(false)
     }
@@ -96,7 +101,11 @@ export function AvatarDisplay({
       setAvatarUrl(userProfile.readyPlayerMeAvatar)
       localStorage.setItem("readyPlayerMeAvatar", userProfile.readyPlayerMeAvatar)
     }
-  }, [userProfile?.readyPlayerMeAvatar])
+    if (userProfile?.readyPlayerMeAvatarPreview) {
+      setAvatarPreview(userProfile.readyPlayerMeAvatarPreview)
+      localStorage.setItem("readyPlayerMeAvatarPreview", userProfile.readyPlayerMeAvatarPreview)
+    }
+  }, [userProfile?.readyPlayerMeAvatar, userProfile?.readyPlayerMeAvatarPreview])
 
   useEffect(() => {
     if (!showAvatarCreator && !showAvatarLibrary) return
@@ -164,12 +173,15 @@ export function AvatarDisplay({
 
         console.log("[ReadyPlayerMe] Avatar exported:", newAvatarUrl)
         setAvatarUrl(newAvatarUrl)
+        const preview = getAvatarPreviewUrl(newAvatarUrl)
+        setAvatarPreview(preview)
         localStorage.setItem("readyPlayerMeAvatar", newAvatarUrl)
+        localStorage.setItem("readyPlayerMeAvatarPreview", preview)
         window.dispatchEvent(new Event("storage"))
 
         if (user?.uid) {
           try {
-            await saveAvatar(user.uid, newAvatarUrl)
+            await saveAvatar(user.uid, newAvatarUrl, preview)
             await refreshProfile()
             toast.success("Avatar saved to your profile")
           } catch (error) {
@@ -220,7 +232,7 @@ export function AvatarDisplay({
     setShowAvatarCreator(true)
   }
 
-  const handleSelectExistingAvatar = async (url: string) => {
+  const handleSelectExistingAvatar = async (url: string, previewUrl?: string | null) => {
     if (!user?.uid) {
       toast.error("Please sign in to manage avatars")
       return
@@ -228,9 +240,12 @@ export function AvatarDisplay({
 
     try {
       setAvatarUrl(url)
+      const resolvedPreview = previewUrl || getAvatarPreviewUrl(url)
+      setAvatarPreview(resolvedPreview)
       localStorage.setItem("readyPlayerMeAvatar", url)
+      localStorage.setItem("readyPlayerMeAvatarPreview", resolvedPreview)
       window.dispatchEvent(new Event("storage"))
-      await setActiveAvatar(user.uid, url)
+      await setActiveAvatar(user.uid, url, resolvedPreview)
       await refreshProfile()
       toast.success("Avatar updated")
       setShowAvatarLibrary(false)
@@ -388,9 +403,9 @@ export function AvatarDisplay({
                     <Loader2 className="h-16 w-16 animate-spin" />
                     <p className="text-sm text-white/80">Loading avatar...</p>
                   </div>
-                ) : avatarUrl ? (
+                ) : avatarPreview || avatarUrl ? (
                   <img
-                    src={`${avatarUrl}?scene=fullbody-portrait-v1&quality=high&background=transparent`}
+                    src={avatarPreview || getAvatarPreviewUrl(avatarUrl)}
                     alt="Ready Player Me Avatar"
                     className="relative h-full object-contain drop-shadow-[0_30px_50px_rgba(0,0,0,0.5)]"
                   />

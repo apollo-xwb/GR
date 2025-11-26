@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Zap, Rocket, Shield, Trophy, Sparkles, ArrowRight, Wallet, Target, TrendingUp, X } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/contexts/auth-context"
-import { saveAvatar, updateUserPreferences, updateUserStats, setActiveAvatar } from "@/lib/firebase/users"
+import { saveAvatar, updateUserPreferences, updateUserStats, setActiveAvatar, getAvatarPreviewUrl } from "@/lib/firebase/users"
 import { toast } from "sonner"
 import { AvatarLibrary } from "@/components/avatar-library"
 
@@ -24,6 +24,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
   const [showAvatarCreator, setShowAvatarCreator] = useState(false)
   const [avatarCreated, setAvatarCreated] = useState(!!userProfile?.readyPlayerMeAvatar)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(userProfile?.readyPlayerMeAvatar || null)
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(userProfile?.readyPlayerMeAvatarPreview || null)
   const [showSuccess, setShowSuccess] = useState(false)
   const [saving, setSaving] = useState(false)
   const [avatarPersisted, setAvatarPersisted] = useState(!!userProfile?.readyPlayerMeAvatar)
@@ -152,6 +153,8 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         window.dispatchEvent(new Event("storage"))
 
         setAvatarUrl(newAvatarUrl)
+        const preview = getAvatarPreviewUrl(newAvatarUrl)
+        setAvatarPreview(preview)
         setAvatarCreated(true)
         setShowSuccess(true)
         toast.success("Avatar saved! Finish onboarding or create another.")
@@ -159,7 +162,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         if (user?.uid) {
           setSaving(true)
           try {
-            await saveAvatar(user.uid, newAvatarUrl)
+            await saveAvatar(user.uid, newAvatarUrl, preview)
             setAvatarPersisted(true)
             await refreshProfile()
           } catch (error) {
@@ -224,21 +227,24 @@ export function Onboarding({ onComplete }: OnboardingProps) {
     }
   }
 
-  const handleSelectExistingAvatar = async (existingUrl: string) => {
+  const handleSelectExistingAvatar = async (existingUrl: string, previewUrl?: string | null) => {
     if (!existingUrl) return
 
     setAvatarUrl(existingUrl)
+    const resolvedPreview = previewUrl || getAvatarPreviewUrl(existingUrl)
+    setAvatarPreview(resolvedPreview)
     setAvatarCreated(true)
-      setShowAvatarLibrary(false)
+    setShowAvatarLibrary(false)
     setShowSuccess(true)
     localStorage.setItem("readyPlayerMeAvatar", existingUrl)
+    localStorage.setItem("readyPlayerMeAvatarPreview", resolvedPreview)
     window.dispatchEvent(new Event("storage"))
 
     if (user?.uid) {
       try {
-        await setActiveAvatar(user.uid, existingUrl)
+        await setActiveAvatar(user.uid, existingUrl, resolvedPreview)
         toast.success("Avatar updated")
-          await refreshProfile()
+        await refreshProfile()
       } catch (error) {
         console.error("Error setting avatar:", error)
         toast.error("Unable to update avatar")
@@ -439,13 +445,21 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                   // Success state with save button
                   <div className="space-y-6">
                     <div className="aspect-square rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center border-4 heatwave-border overflow-hidden">
-                      <div className="text-center space-y-4 p-6">
-                        <div className="text-6xl animate-bounce">✓</div>
-                        <p className="text-2xl font-black heatwave-text">Avatar Created!</p>
-                        <p className="text-sm text-muted-foreground font-medium">
-                          {avatarPersisted ? "Saved to your profile" : "Your 3D character is ready"}
-                        </p>
-                      </div>
+                      {avatarPreview ? (
+                        <img
+                          src={avatarPreview}
+                          alt="Ready Player Me avatar preview"
+                          className="h-full w-full object-contain bg-gradient-to-b from-black/20 to-transparent"
+                        />
+                      ) : (
+                        <div className="text-center space-y-4 p-6">
+                          <div className="text-6xl animate-bounce">✓</div>
+                          <p className="text-2xl font-black heatwave-text">Avatar Created!</p>
+                          <p className="text-sm text-muted-foreground font-medium">
+                            {avatarPersisted ? "Saved to your profile" : "Your 3D character is ready"}
+                          </p>
+                        </div>
+                      )}
                     </div>
                     
                     <div className="space-y-4">
@@ -465,7 +479,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                           setSaving(true)
                           try {
                             if (user?.uid) {
-                              await saveAvatar(user.uid, avatarUrl)
+                              await saveAvatar(user.uid, avatarUrl, avatarPreview || undefined)
                               setAvatarPersisted(true)
                             }
                             setShowSuccess(false)
@@ -526,7 +540,13 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                   // Default state
                   <>
                     <div className="aspect-square rounded-2xl bg-gradient-to-br from-secondary to-muted flex items-center justify-center border-4 heatwave-border overflow-hidden">
-                      {avatarCreated && avatarUrl ? (
+                      {avatarCreated && avatarUrl && avatarPreview ? (
+                        <img
+                          src={avatarPreview}
+                          alt="Ready Player Me avatar preview"
+                          className="h-full w-full object-contain bg-gradient-to-b from-black/10 to-transparent"
+                        />
+                      ) : avatarCreated && avatarUrl ? (
                         <div className="text-center space-y-4 p-6">
                           <div className="text-6xl">✓</div>
                           <p className="text-lg font-bold heatwave-text">Avatar Created!</p>

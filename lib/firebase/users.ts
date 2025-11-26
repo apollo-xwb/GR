@@ -4,6 +4,7 @@ import { User } from "firebase/auth"
 
 export interface AvatarRecord {
   url: string
+  previewUrl?: string | null
   savedAt: Date
 }
 
@@ -15,6 +16,7 @@ export interface UserProfile {
   userName: string
   avatarUrl: string | null
   readyPlayerMeAvatar: string | null
+  readyPlayerMeAvatarPreview?: string | null
   readyPlayerMeAvatars?: AvatarRecord[]
   selectedTemplate?: string // Track which template was selected
   theme: string
@@ -44,13 +46,14 @@ export const getUserProfile = async (uid: string): Promise<UserProfile | null> =
       const readyPlayerMeAvatars = Array.isArray(data.readyPlayerMeAvatars)
         ? data.readyPlayerMeAvatars
             .map((entry: any) => ({
-            url: entry?.url,
-            savedAt: entry?.savedAt?.toDate
-              ? entry.savedAt.toDate()
-              : entry?.savedAt
-              ? new Date(entry.savedAt)
-              : new Date(),
-          }))
+              url: entry?.url,
+              previewUrl: entry?.previewUrl || null,
+              savedAt: entry?.savedAt?.toDate
+                ? entry.savedAt.toDate()
+                : entry?.savedAt
+                ? new Date(entry.savedAt)
+                : new Date(),
+            }))
             .sort((a, b) => b.savedAt.getTime() - a.savedAt.getTime())
         : []
 
@@ -87,7 +90,13 @@ export const updateUserProfile = async (uid: string, updates: Partial<UserProfil
 }
 
 // Save avatar URL
-export const saveAvatar = async (uid: string, avatarUrl: string) => {
+export const getAvatarPreviewUrl = (modelUrl: string) => {
+  return `https://render.readyplayer.me/render?model=${encodeURIComponent(
+    modelUrl,
+  )}&scene=fullbody-portrait-v1&quality=high&textureAtlas=1024&background=transparent`
+}
+
+export const saveAvatar = async (uid: string, avatarUrl: string, previewUrl?: string | null) => {
   if (!db) {
     throw new Error("Firestore not initialized")
   }
@@ -96,6 +105,7 @@ export const saveAvatar = async (uid: string, avatarUrl: string) => {
     const userRef = doc(db, "users", uid)
     const avatarEntry = {
       url: avatarUrl,
+      previewUrl: previewUrl || getAvatarPreviewUrl(avatarUrl),
       savedAt: new Date(),
     }
 
@@ -104,6 +114,7 @@ export const saveAvatar = async (uid: string, avatarUrl: string) => {
       {
         readyPlayerMeAvatar: avatarUrl,
         avatarUrl: avatarUrl,
+        readyPlayerMeAvatarPreview: avatarEntry.previewUrl,
         readyPlayerMeAvatars: arrayUnion(avatarEntry),
         updatedAt: serverTimestamp(),
       },
@@ -115,7 +126,7 @@ export const saveAvatar = async (uid: string, avatarUrl: string) => {
   }
 }
 
-export const setActiveAvatar = async (uid: string, avatarUrl: string) => {
+export const setActiveAvatar = async (uid: string, avatarUrl: string, previewUrl?: string | null) => {
   if (!db) {
     throw new Error("Firestore not initialized")
   }
@@ -127,6 +138,7 @@ export const setActiveAvatar = async (uid: string, avatarUrl: string) => {
       {
         readyPlayerMeAvatar: avatarUrl,
         avatarUrl: avatarUrl,
+        readyPlayerMeAvatarPreview: previewUrl || getAvatarPreviewUrl(avatarUrl),
         updatedAt: serverTimestamp(),
       },
       { merge: true },
