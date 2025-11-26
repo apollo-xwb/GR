@@ -53,6 +53,7 @@ export function AvatarDisplay({
   const [isLoading, setIsLoading] = useState(true)
   const [showAvatarCreator, setShowAvatarCreator] = useState(false)
   const [showAvatarLibrary, setShowAvatarLibrary] = useState(false)
+  const [isCompactViewport, setIsCompactViewport] = useState(false)
   const avatarCreatorRef = useRef<HTMLIFrameElement | null>(null)
   const readyPlayerMeSubdomain = process.env.NEXT_PUBLIC_READY_PLAYER_ME_SUBDOMAIN || "demo"
   const sanitizedSubdomain = useMemo(
@@ -93,6 +94,15 @@ export function AvatarDisplay({
 
     window.addEventListener("storage", handleStorageChange)
     return () => window.removeEventListener("storage", handleStorageChange)
+  }, [])
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsCompactViewport(window.innerWidth < 640)
+    }
+    handleResize()
+    window.addEventListener("resize", handleResize)
+    return () => window.removeEventListener("resize", handleResize)
   }, [])
 
   useEffect(() => {
@@ -354,28 +364,47 @@ export function AvatarDisplay({
 
   // Full version for avatar tab
   const xpPercent = Math.min(100, Math.max(0, (xp / maxXp) * 100))
+  const cameraConfig = isCompactViewport
+    ? {
+        height: "h-[520px] sm:h-[580px]",
+        target: "0m 1.1m 0m",
+        orbit: "0deg 82deg 3.2m",
+        fov: "30deg",
+      }
+    : {
+        height: "h-[600px] sm:h-[660px] lg:h-[720px]",
+        target: "0m 0.8m 0m",
+        orbit: "0deg 78deg 4m",
+        fov: "24deg",
+      }
 
   return (
     <>
       <Card className="p-0 border-0 bg-transparent shadow-none">
-        <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-background/90 via-background/70 to-secondary/40 backdrop-blur-xl">
-          <div className="absolute inset-0 heatwave-gradient-soft opacity-30" />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.12),transparent),radial-gradient(circle_at_80%_0%,rgba(255,255,255,0.12),transparent)]" />
+        <div className="relative rounded-3xl py-6 lg:py-8">
 
           <div className="relative grid gap-8 p-6 lg:p-10 lg:grid-cols-2 items-center">
-            <div className="order-2 lg:order-1 space-y-6 text-white">
+            <div className="order-2 lg:order-1 space-y-6 text-foreground">
               <div className="flex flex-wrap items-center gap-3 justify-between">
                 <Badge className="heatwave-gradient border-0 text-white px-4 py-2 font-bold shadow-lg">
                   {tier} Tier
                 </Badge>
                 <div className="flex flex-wrap gap-2">
                   {onCustomize && (
-                    <Button variant="outline" className="bg-white/10 border-white/30 text-white" onClick={onCustomize}>
+                    <Button
+                      variant="outline"
+                      className="bg-secondary/30 dark:bg-white/10 border-border dark:border-white/30 text-foreground dark:text-white"
+                      onClick={onCustomize}
+                    >
                       <Settings className="h-4 w-4 mr-2" />
                       Customize
                     </Button>
                   )}
-                  <Button variant="outline" className="bg-white/10 border-white/30 text-white" onClick={() => setShowAvatarLibrary(true)}>
+                  <Button
+                    variant="outline"
+                    className="bg-secondary/30 dark:bg-white/10 border-border dark:border-white/30 text-foreground dark:text-white"
+                    onClick={() => setShowAvatarLibrary(true)}
+                  >
                     <Layers className="h-4 w-4 mr-2" />
                     Manage
                   </Button>
@@ -387,26 +416,26 @@ export function AvatarDisplay({
               </div>
 
               <div>
-                <p className="text-sm uppercase tracking-[0.4em] text-white/70">Operator Status</p>
+                <p className="text-sm uppercase tracking-[0.4em] text-muted-foreground">Operator Status</p>
                 <h2 className="text-3xl sm:text-4xl font-black leading-tight">
                   Engage your avatar to unlock new loan power ups
                 </h2>
               </div>
 
-              <div className="bg-black/30 rounded-2xl border border-white/15 p-4 space-y-4 shadow-inner">
+              <div className="bg-card/70 rounded-2xl border border-border p-4 space-y-4 shadow-inner">
                 <div className="flex items-center justify-between gap-3 flex-wrap">
-                  <span className="text-sm font-semibold text-white/80">XP Progress</span>
-                  <Badge variant="secondary" className="bg-white/15 text-white font-mono border-white/20">
+                  <span className="text-sm font-semibold text-foreground">XP Progress</span>
+                  <Badge variant="secondary" className="bg-secondary/60 dark:bg-white/15 text-foreground dark:text-white font-mono border-border dark:border-white/20">
                     {xp.toLocaleString()}/{maxXp.toLocaleString()}
                   </Badge>
                 </div>
-                <div className="h-3 bg-white/20 rounded-full overflow-hidden">
+                <div className="h-3 bg-muted rounded-full overflow-hidden">
                   <div
-                    className="h-full heatwave-gradient shadow-[0_0_12px_rgba(255,107,53,0.6)]"
+                    className="h-full heatwave-gradient shadow-[0_0_12px_rgba(255,107,53,0.4)]"
                     style={{ width: `${xpPercent}%` }}
                   />
                 </div>
-                <div className="flex items-center justify-between text-xs text-white/70">
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
                   <span>{emote.text}</span>
                   <span>{Math.max(0, maxXp - xp).toLocaleString()} XP until next tier</span>
                 </div>
@@ -414,8 +443,8 @@ export function AvatarDisplay({
             </div>
 
             <div className="order-1 lg:order-2">
-              <div className={`relative h-[320px] sm:h-[380px] lg:h-[420px] flex items-end justify-center ${getTierGlow()}`}>
-                <div className="absolute inset-0 heatwave-gradient blur-3xl opacity-30" />
+              <div className={`relative ${cameraConfig.height} flex items-center justify-center`}>
+                <div className="absolute bottom-10 w-56 h-12 bg-black/40 blur-3xl rounded-full opacity-60" />
             {isLoading ? (
               <div className="flex flex-col items-center gap-3 text-white">
                 <Loader2 className="h-16 w-16 animate-spin" />
@@ -430,15 +459,12 @@ export function AvatarDisplay({
                 interaction-prompt="none"
                 exposure="1"
                 shadow-intensity="0.9"
-                camera-target="0m 0.95m 0m"
-                camera-orbit="0deg 85deg 2.8m"
-                field-of-view="25deg"
+                camera-target={cameraConfig.target}
+                camera-orbit={cameraConfig.orbit}
+                field-of-view={cameraConfig.fov}
                 animation-name="Idle"
                 autoplay
                 animation-crossfade-duration="400"
-                auto-rotate
-                auto-rotate-delay="8000"
-                auto-rotate-speed="0.25deg/s"
                 style={{ width: "100%", height: "100%", background: "transparent" }}
               />
             ) : (

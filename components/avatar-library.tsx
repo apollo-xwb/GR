@@ -69,7 +69,6 @@ export function AvatarLibrary({
                       src={`${avatar.url}?quality=medium`}
                       poster={avatar.previewUrl || getAvatarPreviewUrl(avatar.url)}
                       camera-controls
-                      disable-zoom
                       auto-rotate
                       interaction-prompt="none"
                       disable-zoom
@@ -77,20 +76,25 @@ export function AvatarLibrary({
                       exposure="1"
                       animation-name="Idle"
                       autoplay
-                      camera-target="0m 1m 0m"
-                      camera-orbit="0deg 90deg 2.4m"
+                      camera-target="0m 0.95m 0m"
+                      camera-orbit="0deg 78deg 3.8m"
+                      field-of-view="26deg"
+                      auto-rotate-delay="6000"
+                      auto-rotate-speed="0.18deg/s"
                       style={{ width: "100%", height: "100%", background: "transparent" }}
                     />
                   </div>
-                  <div className="p-4 flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-semibold">
+                  <div className="p-4 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold truncate">
                         {avatar.savedAt ? formatDistanceToNow(avatar.savedAt, { addSuffix: true }) : "Recently saved"}
                       </p>
-                      <p className="text-xs text-muted-foreground truncate">{avatar.url}</p>
+                      {avatar.previewUrl && (
+                        <p className="text-xs text-muted-foreground truncate">{new URL(avatar.url).hostname}</p>
+                      )}
                     </div>
                     {activeUrl === avatar.url && (
-                      <Badge className="heatwave-gradient text-white border-0">Active</Badge>
+                      <Badge className="heatwave-gradient text-white border-0 whitespace-nowrap px-3">Active</Badge>
                     )}
                   </div>
                 </button>
