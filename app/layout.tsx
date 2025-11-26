@@ -2,6 +2,7 @@ import type React from "react"
 import type { Metadata } from "next"
 import { Space_Grotesk, Outfit } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
+import Script from "next/script"
 import "./globals.css"
 import { Toaster } from "@/components/ui/sonner"
 
@@ -73,6 +74,11 @@ export default function RootLayout({
         <Toaster />
         <Analytics />
       </body>
+      <Script
+        src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"
+        strategy="beforeInteractive"
+        type="module"
+      />
     </html>
   )
 }

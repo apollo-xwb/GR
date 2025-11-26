@@ -10,6 +10,24 @@ import { saveAvatar, setActiveAvatar, getAvatarPreviewUrl } from "@/lib/firebase
 import { toast } from "sonner"
 import { AvatarLibrary } from "@/components/avatar-library"
 
+declare global {
+  namespace JSX {
+    interface IntrinsicElements {
+      "model-viewer": React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement> & {
+        src?: string
+        poster?: string
+        "camera-controls"?: boolean | string
+        "auto-rotate"?: boolean | string
+        "shadow-intensity"?: string | number
+        "interaction-prompt"?: string
+        "disable-zoom"?: boolean | string
+        "exposure"?: string | number
+        "tone-mapping"?: "neutral" | "aces"
+      }
+    }
+  }
+}
+
 interface AvatarDisplayProps {
   tier: string
   xp: number
@@ -398,23 +416,29 @@ export function AvatarDisplay({
             <div className="order-1 lg:order-2">
               <div className={`relative h-[320px] sm:h-[380px] lg:h-[420px] flex items-end justify-center ${getTierGlow()}`}>
                 <div className="absolute inset-0 heatwave-gradient blur-3xl opacity-30" />
-                {isLoading ? (
-                  <div className="flex flex-col items-center gap-3 text-white">
-                    <Loader2 className="h-16 w-16 animate-spin" />
-                    <p className="text-sm text-white/80">Loading avatar...</p>
-                  </div>
-                ) : avatarPreview || avatarUrl ? (
-                  <img
-                    src={avatarPreview || getAvatarPreviewUrl(avatarUrl)}
-                    alt="Ready Player Me Avatar"
-                    className="relative h-full object-contain drop-shadow-[0_30px_50px_rgba(0,0,0,0.5)]"
-                  />
-                ) : (
-                  <div className="flex flex-col items-center gap-3 text-white">
-                    <div className="text-9xl">{emote.emoji}</div>
-                    <p className="text-sm text-white/80">Create your 3D avatar</p>
-                  </div>
-                )}
+            {isLoading ? (
+              <div className="flex flex-col items-center gap-3 text-white">
+                <Loader2 className="h-16 w-16 animate-spin" />
+                <p className="text-sm text-white/80">Loading avatar...</p>
+              </div>
+            ) : avatarUrl ? (
+              <model-viewer
+                src={`${avatarUrl}?quality=high&textureAtlas=1024`}
+                poster={avatarPreview || "/placeholder-avatar.png"}
+                camera-controls
+                auto-rotate
+                disable-zoom
+                interaction-prompt="none"
+                exposure="1"
+                shadow-intensity="0.8"
+                style={{ width: "100%", height: "100%", background: "transparent" }}
+              />
+            ) : (
+              <div className="flex flex-col items-center gap-3 text-white">
+                <div className="text-9xl">{emote.emoji}</div>
+                <p className="text-sm text-white/80">Create your 3D avatar</p>
+              </div>
+            )}
               </div>
             </div>
           </div>

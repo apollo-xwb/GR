@@ -120,6 +120,7 @@ export const saveAvatar = async (uid: string, avatarUrl: string, previewUrl?: st
       },
       { merge: true },
     )
+    console.log("[ReadyPlayerMe] Stored avatar preview:", avatarEntry.previewUrl)
   } catch (error) {
     console.error("Error saving avatar:", error)
     throw error
