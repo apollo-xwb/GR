@@ -13,6 +13,7 @@ import { AvatarLibrary } from "@/components/avatar-library"
 interface AvatarDisplayProps {
   tier: string
   xp: number
+  maxXp?: number
   onCustomize?: () => void
   emoteState?: "idle" | "happy" | "focused" | "excited"
   activeLoan?: boolean
@@ -22,12 +23,13 @@ interface AvatarDisplayProps {
 export function AvatarDisplay({
   tier,
   xp,
+  maxXp = 5000,
   onCustomize,
   emoteState = "idle",
   activeLoan = false,
   compact = false,
 }: AvatarDisplayProps) {
-  const { user, userProfile } = useAuth()
+  const { user, userProfile, refreshProfile } = useAuth()
   const [avatarUrl, setAvatarUrl] = useState<string>("")
   const [isLoading, setIsLoading] = useState(true)
   const [showAvatarCreator, setShowAvatarCreator] = useState(false)
@@ -97,6 +99,26 @@ export function AvatarDisplay({
   }, [userProfile?.readyPlayerMeAvatar])
 
   useEffect(() => {
+    if (!showAvatarCreator && !showAvatarLibrary) return
+    if (typeof document === "undefined") return
+
+    const body = document.body
+    const current = Number(body.dataset.modalCount || "0") + 1
+    body.dataset.modalCount = `${current}`
+    body.classList.add("modal-open")
+
+    return () => {
+      const next = Math.max(0, Number(body.dataset.modalCount || "1") - 1)
+      if (next === 0) {
+        body.classList.remove("modal-open")
+        delete body.dataset.modalCount
+      } else {
+        body.dataset.modalCount = `${next}`
+      }
+    }
+  }, [showAvatarCreator, showAvatarLibrary])
+
+  useEffect(() => {
     if (!showAvatarCreator) return
 
     let subscribed = false
@@ -128,6 +150,7 @@ export function AvatarDisplay({
 
       if (data?.source !== "readyplayerme") return
       console.debug("[ReadyPlayerMe] message", data.eventName, data)
+      console.debug("[ReadyPlayerMe] message", data.eventName, data)
 
       if (data.eventName === "v1.frame.ready" && !subscribed) {
         subscribed = true
@@ -148,6 +171,7 @@ export function AvatarDisplay({
         if (user?.uid) {
           try {
             await saveAvatar(user.uid, newAvatarUrl)
+            await refreshProfile()
             toast.success("Avatar saved to your profile")
           } catch (error) {
             console.error("Error saving avatar to Firebase:", error)
@@ -208,6 +232,7 @@ export function AvatarDisplay({
       localStorage.setItem("readyPlayerMeAvatar", url)
       window.dispatchEvent(new Event("storage"))
       await setActiveAvatar(user.uid, url)
+      await refreshProfile()
       toast.success("Avatar updated")
       setShowAvatarLibrary(false)
     } catch (error) {
@@ -275,7 +300,7 @@ export function AvatarDisplay({
           <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center">
             <div className="relative w-full h-full md:w-[90vw] md:h-[85vh] md:max-w-3xl md:rounded-2xl bg-background overflow-hidden shadow-2xl border-0 md:border-4 heatwave-border flex flex-col">
               <button
-                className="absolute top-3 left-3 z-20 inline-flex items-center gap-1 rounded-full bg-black/60 text-white px-3 py-1 text-xs font-semibold shadow-lg"
+                className="absolute top-3 left-1/2 -translate-x-1/2 z-20 inline-flex items-center gap-1 rounded-full bg-black/60 text-white px-3 py-1 text-xs font-semibold shadow-lg"
                 onClick={() => setShowAvatarCreator(false)}
               >
                 <X className="h-3.5 w-3.5" />
@@ -296,69 +321,88 @@ export function AvatarDisplay({
   }
 
   // Full version for avatar tab
+  const xpPercent = Math.min(100, Math.max(0, (xp / maxXp) * 100))
+
   return (
     <>
-      <Card className="p-6 relative overflow-hidden bg-card/50 backdrop-blur-sm border-0">
-        <div className="absolute inset-0 heatwave-gradient-soft" />
+      <Card className="p-0 border-0 bg-transparent shadow-none">
+        <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-background/90 via-background/70 to-secondary/40 backdrop-blur-xl">
+          <div className="absolute inset-0 heatwave-gradient-soft opacity-30" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.12),transparent),radial-gradient(circle_at_80%_0%,rgba(255,255,255,0.12),transparent)]" />
 
-        <div className="relative">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 heatwave-text" />
-              <h3 className="font-bold">Your Avatar</h3>
+          <div className="relative grid gap-8 p-6 lg:p-10 lg:grid-cols-2 items-center">
+            <div className="order-2 lg:order-1 space-y-6 text-white">
+              <div className="flex flex-wrap items-center gap-3 justify-between">
+                <Badge className="heatwave-gradient border-0 text-white px-4 py-2 font-bold shadow-lg">
+                  {tier} Tier
+                </Badge>
+                <div className="flex flex-wrap gap-2">
+                  {onCustomize && (
+                    <Button variant="outline" className="bg-white/10 border-white/30 text-white" onClick={onCustomize}>
+                      <Settings className="h-4 w-4 mr-2" />
+                      Customize
+                    </Button>
+                  )}
+                  <Button variant="outline" className="bg-white/10 border-white/30 text-white" onClick={() => setShowAvatarLibrary(true)}>
+                    <Layers className="h-4 w-4 mr-2" />
+                    Manage
+                  </Button>
+                  <Button className="heatwave-gradient border-0 text-white" onClick={openAvatarCreator}>
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    {avatarUrl ? "Create Again" : "Create Avatar"}
+                  </Button>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-sm uppercase tracking-[0.4em] text-white/70">Operator Status</p>
+                <h2 className="text-3xl sm:text-4xl font-black leading-tight">
+                  Engage your avatar to unlock new loan power ups
+                </h2>
+              </div>
+
+              <div className="bg-black/30 rounded-2xl border border-white/15 p-4 space-y-4 shadow-inner">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <span className="text-sm font-semibold text-white/80">XP Progress</span>
+                  <Badge variant="secondary" className="bg-white/15 text-white font-mono border-white/20">
+                    {xp.toLocaleString()}/{maxXp.toLocaleString()}
+                  </Badge>
+                </div>
+                <div className="h-3 bg-white/20 rounded-full overflow-hidden">
+                  <div
+                    className="h-full heatwave-gradient shadow-[0_0_12px_rgba(255,107,53,0.6)]"
+                    style={{ width: `${xpPercent}%` }}
+                  />
+                </div>
+                <div className="flex items-center justify-between text-xs text-white/70">
+                  <span>{emote.text}</span>
+                  <span>{Math.max(0, maxXp - xp).toLocaleString()} XP until next tier</span>
+                </div>
+              </div>
             </div>
-            <Badge variant="outline" className="gap-1">
-              {tier} Tier
-            </Badge>
-          </div>
 
-          <div
-            className={`relative aspect-square rounded-2xl bg-gradient-to-br from-secondary to-muted mb-4 flex items-center justify-center border-4 heatwave-border overflow-hidden ${getTierGlow()}`}
-          >
-            {isLoading ? (
-              <div className="flex flex-col items-center gap-3">
-                <Loader2 className="h-16 w-16 animate-spin heatwave-text" />
-                <p className="text-sm text-muted-foreground">Loading Avatar...</p>
+            <div className="order-1 lg:order-2">
+              <div className={`relative h-[320px] sm:h-[380px] lg:h-[420px] flex items-end justify-center ${getTierGlow()}`}>
+                <div className="absolute inset-0 heatwave-gradient blur-3xl opacity-30" />
+                {isLoading ? (
+                  <div className="flex flex-col items-center gap-3 text-white">
+                    <Loader2 className="h-16 w-16 animate-spin" />
+                    <p className="text-sm text-white/80">Loading avatar...</p>
+                  </div>
+                ) : avatarUrl ? (
+                  <img
+                    src={`${avatarUrl}?scene=fullbody-portrait-v1&quality=high&background=transparent`}
+                    alt="Ready Player Me Avatar"
+                    className="relative h-full object-contain drop-shadow-[0_30px_50px_rgba(0,0,0,0.5)]"
+                  />
+                ) : (
+                  <div className="flex flex-col items-center gap-3 text-white">
+                    <div className="text-9xl">{emote.emoji}</div>
+                    <p className="text-sm text-white/80">Create your 3D avatar</p>
+                  </div>
+                )}
               </div>
-            ) : avatarUrl ? (
-              <div className="w-full h-full flex items-center justify-center bg-gradient-to-b from-secondary/20 to-background">
-                <img
-                  src={`${avatarUrl}?scene=fullbody-portrait-v1&quality=high`}
-                  alt="Ready Player Me Avatar"
-                  className="h-full w-full object-cover"
-                />
-              </div>
-            ) : (
-              <div className="flex flex-col items-center gap-3">
-                <div className="text-9xl animate-pulse">{emote.emoji}</div>
-                <p className="text-sm text-muted-foreground">Create your 3D avatar</p>
-              </div>
-            )}
-
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-background/90 backdrop-blur-sm rounded-full border border-border">
-              <p className={`text-sm font-medium ${emote.color}`}>{emote.text}</p>
             </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <Button variant="outline" className="gap-2 bg-transparent" onClick={onCustomize}>
-              <Settings className="h-4 w-4" />
-              Customize
-            </Button>
-            <Button
-              className="gap-2 heatwave-gradient border-0 text-white hover:opacity-90"
-              onClick={openAvatarCreator}
-            >
-              <Sparkles className="h-4 w-4" />
-              {avatarUrl ? "Edit Avatar" : "Create Avatar"}
-            </Button>
-          </div>
-
-          <div className="mt-4 p-3 bg-secondary/50 rounded-lg border border-border">
-            <p className="text-xs text-muted-foreground mb-1">Avatar Emotes:</p>
-            <p className="text-sm">
-              Your 3D avatar reacts to your loan activity - complete loans on time to see happy emotes!
-            </p>
           </div>
         </div>
       </Card>
@@ -367,7 +411,7 @@ export function AvatarDisplay({
         <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center">
           <div className="relative w-full h-full md:w-[90vw] md:h-[85vh] md:max-w-3xl md:rounded-2xl bg-background overflow-hidden shadow-2xl border-0 md:border-4 heatwave-border flex flex-col">
             <button
-              className="absolute top-4 left-4 z-20 inline-flex items-center gap-1 rounded-full bg-black/60 text-white px-4 py-1.5 text-sm font-semibold shadow-lg"
+              className="absolute top-4 left-1/2 -translate-x-1/2 z-20 inline-flex items-center gap-1 rounded-full bg-black/60 text-white px-4 py-1.5 text-sm font-semibold shadow-lg"
               onClick={() => setShowAvatarCreator(false)}
             >
               <X className="h-4 w-4" />

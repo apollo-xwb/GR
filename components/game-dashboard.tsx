@@ -7,12 +7,8 @@ import { Badge } from "@/components/ui/badge"
 import {
   Zap,
   Trophy,
-  Wallet,
   Clock,
-  Star,
   ChevronRight,
-  Plus,
-  ArrowRightLeft,
   Coins,
   Target,
   History,
@@ -41,7 +37,6 @@ export function GameDashboard({ activeTab: externalActiveTab, onTabChange }: Gam
   const { user, userProfile } = useAuth()
   
   // Use Firebase data if available, otherwise use defaults
-  const balance = userProfile?.balance || 8700.46
   const xp = userProfile?.xp || 2450
   const tier = userProfile?.tier || "Silver"
   const maxXP = 5000
@@ -241,12 +236,36 @@ export function GameDashboard({ activeTab: externalActiveTab, onTabChange }: Gam
         </Card>
       )}
 
-      <Card className="p-6 mb-5 bg-gradient-to-br from-card via-card to-secondary/30 border-0 relative overflow-hidden shadow-lg">
-        <div className="absolute inset-0 heatwave-gradient-soft" />
-        <div className="absolute top-0 right-0 w-48 h-48 heatwave-gradient blur-3xl opacity-20" />
-        <div className="relative">
-          <AvatarDisplay tier={tier} xp={xp} emoteState={getAvatarEmote()} activeLoan={activeLoan} compact={true} />
+      <AvatarDisplay tier={tier} xp={xp} maxXp={maxXP} emoteState={getAvatarEmote()} activeLoan={activeLoan} />
+
+      <Card className="p-6 mt-6 mb-5 bg-gradient-to-br from-card to-secondary/30 backdrop-blur-sm border-0 shadow-lg">
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex-1">
+            <p className="text-sm text-muted-foreground mb-2 font-medium">Available Loan Limit</p>
+            <p className="text-5xl font-bold tracking-tight heatwave-text">R{loanLimit.toLocaleString()}</p>
+          </div>
+          <div className="p-4 rounded-2xl heatwave-gradient shadow-lg">
+            <Trophy className="h-10 w-10 text-white" />
+          </div>
         </div>
+        {!activeLoan ? (
+          <Button
+            className="w-full gap-2 heatwave-gradient border-0 text-white font-bold h-14 hover:opacity-90 transition-opacity shadow-lg text-base"
+            size="lg"
+          >
+            <Zap className="h-5 w-5" />
+            Request Loan Now
+          </Button>
+        ) : (
+          <div className="flex items-center gap-3 p-5 bg-secondary/50 rounded-2xl border-2 border-border shadow-inner">
+            <Clock className="h-6 w-6 heatwave-text flex-shrink-0" />
+            <div className="flex-1">
+              <p className="text-base font-bold">Active Loan</p>
+              <p className="text-sm text-muted-foreground">48 hours remaining</p>
+            </div>
+            <Badge className="heatwave-gradient border-0 text-white px-3 py-1.5 font-semibold">Active</Badge>
+          </div>
+        )}
       </Card>
 
       <Tabs value={activeTab === "wallet" ? "wallet" : activeTab === "dashboard" ? "dashboard" : "dashboard"} onValueChange={handleTabChange} className="w-full">
@@ -281,91 +300,6 @@ export function GameDashboard({ activeTab: externalActiveTab, onTabChange }: Gam
               </div>
             </Card>
           </div>
-
-          <Card className="p-6 bg-gradient-to-br from-card to-secondary/30 backdrop-blur-sm border-0 shadow-lg">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <div className="p-2.5 rounded-xl heatwave-gradient shadow-md">
-                  <Zap className="h-5 w-5 text-white" />
-                </div>
-                <span className="text-base font-bold">XP Progress</span>
-              </div>
-              <Badge variant="secondary" className="gap-1.5 font-mono px-3 py-1.5">
-                <Star className="h-3.5 w-3.5 fill-current heatwave-text" />
-                {xp.toLocaleString()}/{maxXP.toLocaleString()}
-              </Badge>
-            </div>
-            <div className="relative h-4 bg-secondary rounded-full overflow-hidden shadow-inner">
-              <div
-                className="absolute inset-y-0 left-0 heatwave-gradient rounded-full transition-all duration-500 shadow-sm"
-                style={{ width: `${(xp / maxXP) * 100}%` }}
-              />
-            </div>
-            <p className="text-sm text-muted-foreground mt-3 font-medium">
-              {(maxXP - xp).toLocaleString()} XP until {tier === "Silver" ? "Gold" : "next"} tier
-            </p>
-          </Card>
-
-          <Card className="p-7 bg-gradient-to-br from-card via-card to-secondary/40 border-0 relative overflow-hidden shadow-xl">
-            <div className="absolute top-0 right-0 w-72 h-72 heatwave-gradient blur-3xl opacity-25 rounded-full" />
-            <div className="relative">
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                  Your Balance
-                </span>
-                <Badge variant="outline" className="gap-1.5 font-mono border-2 px-2.5 py-1">
-                  <Wallet className="h-3.5 w-3.5" />
-                  ...8887
-                </Badge>
-              </div>
-              <h1 className="text-6xl font-bold mb-7 tracking-tight">
-                R{balance.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </h1>
-              <div className="grid grid-cols-2 gap-3">
-                <Button
-                  className="gap-2 h-14 heatwave-gradient border-0 text-white font-bold hover:opacity-90 transition-opacity shadow-lg text-base"
-                  size="lg"
-                >
-                  <Plus className="h-5 w-5" />
-                  Add Money
-                </Button>
-                <Button variant="secondary" className="gap-2 h-14 font-semibold text-base shadow-md" size="lg">
-                  <ArrowRightLeft className="h-5 w-5" />
-                  Transfer
-                </Button>
-              </div>
-            </div>
-          </Card>
-
-          <Card className="p-6 bg-gradient-to-br from-card to-secondary/30 backdrop-blur-sm border-0 shadow-lg">
-            <div className="flex items-center justify-between mb-5">
-              <div className="flex-1">
-                <p className="text-sm text-muted-foreground mb-2 font-medium">Available Loan Limit</p>
-                <p className="text-5xl font-bold tracking-tight heatwave-text">R{loanLimit.toLocaleString()}</p>
-              </div>
-              <div className="p-4 rounded-2xl heatwave-gradient shadow-lg">
-                <Trophy className="h-10 w-10 text-white" />
-              </div>
-            </div>
-            {!activeLoan ? (
-              <Button
-                className="w-full gap-2 heatwave-gradient border-0 text-white font-bold h-14 hover:opacity-90 transition-opacity shadow-lg text-base"
-                size="lg"
-              >
-                <Zap className="h-5 w-5" />
-                Request Loan Now
-              </Button>
-            ) : (
-              <div className="flex items-center gap-3 p-5 bg-secondary/50 rounded-2xl border-2 border-border shadow-inner">
-                <Clock className="h-6 w-6 heatwave-text flex-shrink-0" />
-                <div className="flex-1">
-                  <p className="text-base font-bold">Active Loan</p>
-                  <p className="text-sm text-muted-foreground">48 hours remaining</p>
-                </div>
-                <Badge className="heatwave-gradient border-0 text-white px-3 py-1.5 font-semibold">Active</Badge>
-              </div>
-            )}
-          </Card>
 
           <div className="grid grid-cols-2 gap-3">
             {stats.map((stat, i) => {

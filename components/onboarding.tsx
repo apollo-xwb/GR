@@ -17,7 +17,7 @@ interface OnboardingProps {
 }
 
 export function Onboarding({ onComplete }: OnboardingProps) {
-  const { user, userProfile } = useAuth()
+  const { user, userProfile, refreshProfile } = useAuth()
   const [step, setStep] = useState(0)
   const [name, setName] = useState(userProfile?.userName || "")
   const [selectedTheme, setSelectedTheme] = useState(userProfile?.theme || "sunset")
@@ -48,13 +48,13 @@ export function Onboarding({ onComplete }: OnboardingProps) {
   
   // Handle body scroll lock when modal is open
   useEffect(() => {
-    if (!showAvatarCreator || typeof document === "undefined") return
+    if ((!showAvatarCreator && !showAvatarLibrary) || typeof document === "undefined") return
 
     const body = document.body
     const current = Number(body.dataset.modalCount || "0") + 1
     body.dataset.modalCount = `${current}`
     body.classList.add("modal-open")
-
+    
     return () => {
       const next = Math.max(0, Number(body.dataset.modalCount || "1") - 1)
       if (next === 0) {
@@ -64,7 +64,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         body.dataset.modalCount = `${next}`
       }
     }
-  }, [showAvatarCreator])
+  }, [showAvatarCreator, showAvatarLibrary])
 
   const themes = [
     { id: "sunset", name: "Sunset", colors: ["#FF6B35", "#F7931E", "#E94823"] },
@@ -162,6 +162,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
           try {
             await saveAvatar(user.uid, newAvatarUrl)
             setAvatarPersisted(true)
+            await refreshProfile()
           } catch (error) {
             console.error("Error saving avatar to Firebase:", error)
             toast.error("Failed to save avatar. Please try again.")
@@ -229,7 +230,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
 
     setAvatarUrl(existingUrl)
     setAvatarCreated(true)
-    setShowAvatarLibrary(false)
+      setShowAvatarLibrary(false)
     setShowSuccess(true)
     localStorage.setItem("readyPlayerMeAvatar", existingUrl)
     window.dispatchEvent(new Event("storage"))
@@ -238,6 +239,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
       try {
         await setActiveAvatar(user.uid, existingUrl)
         toast.success("Avatar updated")
+          await refreshProfile()
       } catch (error) {
         console.error("Error setting avatar:", error)
         toast.error("Unable to update avatar")
@@ -695,7 +697,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
             }}
           >
             <button
-              className="absolute top-3 left-3 z-20 inline-flex items-center gap-1 rounded-full bg-black/60 text-white px-3 py-1 text-xs font-semibold shadow-lg sm:top-4 sm:left-4 sm:text-sm sm:px-4 sm:py-1.5"
+              className="absolute top-3 left-1/2 -translate-x-1/2 z-20 inline-flex items-center gap-1 rounded-full bg-black/60 text-white px-4 py-1.5 text-xs font-semibold shadow-lg sm:top-4 sm:text-sm"
               onClick={() => setShowAvatarCreator(false)}
             >
               <X className="h-4 w-4" />
