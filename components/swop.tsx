@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -21,16 +21,41 @@ import {
   X,
 } from "lucide-react"
 import { toast } from "sonner"
+import { BrowserQRCodeReader } from "@zxing/browser"
+
+const PaymentAnimation = ({ label }: { label: string }) => (
+  <div className="flex flex-col items-center gap-4 py-6">
+    <div className="payment-orbit relative h-28 w-28 flex items-center justify-center">
+      <div className="payment-orbit-ring" />
+      <div className="payment-orbit-core heatwave-gradient text-white rounded-full h-16 w-16 flex items-center justify-center text-2xl font-black shadow-2xl">
+        ⚡
+      </div>
+    </div>
+    <p className="text-sm font-semibold text-muted-foreground">{label}</p>
+  </div>
+)
 
 export function Swop() {
   const [activeView, setActiveView] = useState<"send" | "receive" | "add" | "withdraw">("send")
   const [amount, setAmount] = useState("")
   const [recipient, setRecipient] = useState("")
-  const [balance] = useState(8700.46)
-  const [cardBalance] = useState(2500.0)
+  const [walletBalance, setWalletBalance] = useState(8700.46)
+  const [cardBalance] = useState(2500)
   const [showQrModal, setShowQrModal] = useState(false)
+  const [qrContext, setQrContext] = useState<"send" | "receive">("send")
+  const [qrMode, setQrMode] = useState<"upload" | "scan">("upload")
   const [qrPayload, setQrPayload] = useState("")
   const [qrPreview, setQrPreview] = useState<string | null>(null)
+  const [isScanning, setIsScanning] = useState(false)
+  const [scanError, setScanError] = useState<string | null>(null)
+  const [paymentSummary, setPaymentSummary] = useState<{ recipient: string; amount: number } | null>(null)
+  const [confirmationStage, setConfirmationStage] = useState<"idle" | "summary" | "processing" | "success">("idle")
+  const [incomingSummary, setIncomingSummary] = useState<{ sender: string; amount: number } | null>(null)
+  const [incomingStage, setIncomingStage] = useState<"idle" | "summary" | "processing" | "success">("idle")
+  const videoRef = useRef<HTMLVideoElement | null>(null)
+  const codeReaderRef = useRef<BrowserQRCodeReader | null>(null)
+  const processingTimeout = useRef<NodeJS.Timeout | null>(null)
+  const [lastScanValue, setLastScanValue] = useState<string | null>(null)
 
   const recentContacts = [
     { id: 1, name: "Alex Johnson", username: "@alexj", avatar: "👤" },
@@ -44,19 +69,173 @@ export function Swop() {
     { id: 3, name: "Mike Davis", amount: 300, type: "sent", time: "2d ago" },
   ]
 
+  const updateWalletBalance = (delta: number) => {
+    setWalletBalance((prev) => Number(prev) + delta)
+  }
+
+  const resetProcessingTimeout = () => {
+    if (processingTimeout.current) {
+      clearTimeout(processingTimeout.current)
+      processingTimeout.current = null
+    }
+  }
+
+  const parsePayload = (raw: string) => {
+    if (!raw) return null
+    const [target, rawAmount] = raw.split("|").map((part) => part.trim())
+    if (!target && !rawAmount) return null
+    const parsedAmount = rawAmount ? Number(rawAmount) : undefined
+    if (rawAmount && Number.isNaN(parsedAmount)) return null
+    return {
+      target: target || "",
+      amount: parsedAmount,
+    }
+  }
+
+  const handleDecodedPayload = (raw: string) => {
+    if (!raw || raw === lastScanValue) return
+    setLastScanValue(raw)
+    const parsed = parsePayload(raw)
+    if (!parsed) {
+      toast.error("Unsupported QR payload")
+      return
+    }
+    if (parsed.target) {
+      if (qrContext === "send") {
+        setRecipient(parsed.target)
+      }
+    }
+    if (parsed.amount !== undefined) {
+      if (qrContext === "send") {
+        setAmount(parsed.amount.toString())
+      }
+    }
+
+    if (qrContext === "send") {
+      const amountNumber = (parsed.amount ?? Number(amount)) || 0
+      setPaymentSummary({
+        recipient: parsed.target || recipient || "@unknown",
+        amount: amountNumber,
+      })
+      setConfirmationStage("summary")
+    } else {
+      const amountNumber = parsed.amount ?? 0
+      setIncomingSummary({
+        sender: parsed.target || "Someone",
+        amount: amountNumber,
+      })
+      setIncomingStage("summary")
+      if (amountNumber > 0) {
+        updateWalletBalance(amountNumber)
+      }
+    }
+
+    toast.success("QR details captured")
+    setShowQrModal(false)
+    stopScanner()
+  }
+
+  const startScanner = async () => {
+    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+      setScanError("Camera access is not supported in this browser.")
+      return
+    }
+    setScanError(null)
+    setIsScanning(true)
+
+    if (!codeReaderRef.current) {
+      codeReaderRef.current = new BrowserQRCodeReader(undefined, {
+        delayBetweenScanAttempts: 400,
+        delayBetweenScanSuccess: 800,
+      })
+    }
+
+    try {
+      await codeReaderRef.current.decodeFromVideoDevice(
+        undefined,
+        videoRef.current,
+        (result, err) => {
+          if (result) {
+            handleDecodedPayload(result.getText())
+          }
+          if (err && err.name !== "NotFoundException") {
+            setScanError(err.message)
+          }
+        },
+      )
+    } catch (error: any) {
+      setScanError(error?.message || "Unable to access camera")
+      setIsScanning(false)
+    }
+  }
+
+  const stopScanner = () => {
+    setIsScanning(false)
+    if (codeReaderRef.current) {
+      try {
+        codeReaderRef.current.reset()
+      } catch {
+        // ignore reset errors
+      }
+    }
+    const stream = videoRef.current?.srcObject as MediaStream | null
+    stream?.getTracks().forEach((track) => track.stop())
+    if (videoRef.current) {
+      videoRef.current.srcObject = null
+    }
+  }
+
   const handleSend = () => {
-    // Handle send logic
-    console.log("Sending", amount, "to", recipient)
+    if (!recipient || !amount) {
+      toast.error("Enter an amount and recipient first")
+      return
+    }
+    const numericAmount = Number(amount)
+    if (Number.isNaN(numericAmount) || numericAmount <= 0) {
+      toast.error("Enter a valid amount")
+      return
+    }
+    setPaymentSummary({ recipient, amount: numericAmount })
+    setConfirmationStage("summary")
   }
 
   const handleAddMoney = () => {
-    // Handle add money logic
-    console.log("Adding money")
+    toast.success("Card linked top-up coming soon")
   }
 
   const handleWithdraw = () => {
-    // Handle withdraw logic
-    console.log("Withdrawing", amount)
+    toast.success("Withdrawals will be available soon")
+  }
+
+  const confirmPayment = () => {
+    if (!paymentSummary || confirmationStage === "processing") return
+    setConfirmationStage("processing")
+    resetProcessingTimeout()
+    processingTimeout.current = setTimeout(() => {
+      updateWalletBalance(-paymentSummary.amount)
+      setConfirmationStage("success")
+      toast.success(`Sent R${paymentSummary.amount.toFixed(2)} to ${paymentSummary.recipient}`)
+      processingTimeout.current = setTimeout(() => {
+        setConfirmationStage("idle")
+        setPaymentSummary(null)
+        setAmount("")
+        setRecipient("")
+      }, 1600)
+    }, 1500)
+  }
+
+  const acknowledgeIncoming = () => {
+    if (!incomingSummary) return
+    setIncomingStage("processing")
+    resetProcessingTimeout()
+    processingTimeout.current = setTimeout(() => {
+      setIncomingStage("success")
+      toast.success(`Received R${incomingSummary.amount.toFixed(2)} from ${incomingSummary.sender}`)
+      processingTimeout.current = setTimeout(() => {
+        setIncomingStage("idle")
+        setIncomingSummary(null)
+      }, 1600)
+    }, 1400)
   }
 
   useEffect(() => {
@@ -76,11 +255,46 @@ export function Swop() {
     }
   }, [showQrModal])
 
+  useEffect(() => {
+    if (showQrModal && qrMode === "scan") {
+      startScanner()
+    } else {
+      stopScanner()
+    }
+    return () => {
+      stopScanner()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showQrModal, qrMode])
+
+  useEffect(() => {
+    return () => {
+      resetProcessingTimeout()
+      stopScanner()
+    }
+  }, [])
+
+  useEffect(() => {
+    if (showQrModal) {
+      setLastScanValue(null)
+    }
+  }, [showQrModal])
+
   const handleQrFile = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
     const reader = new FileReader()
-    reader.onload = () => setQrPreview(reader.result as string)
+    reader.onload = async () => {
+      const dataUrl = reader.result as string
+      setQrPreview(dataUrl)
+      try {
+        const readerInstance = new BrowserQRCodeReader()
+        const result = await readerInstance.decodeFromImageUrl(dataUrl)
+        handleDecodedPayload(result.getText())
+      } catch (error: any) {
+        setScanError(error?.message || "Couldn't read QR from image. Paste the payload instead.")
+      }
+    }
     reader.readAsDataURL(file)
   }
 
@@ -89,11 +303,7 @@ export function Swop() {
       toast.error("Paste a QR payload first")
       return
     }
-    const [target, qrAmount] = qrPayload.split("|").map((part) => part.trim())
-    if (target) setRecipient(target)
-    if (qrAmount) setAmount(qrAmount)
-    toast.success("QR payment details applied")
-    setShowQrModal(false)
+    handleDecodedPayload(qrPayload.trim())
   }
 
   return (
@@ -122,7 +332,7 @@ export function Swop() {
             </Badge>
           </div>
           <h1 className="text-3xl sm:text-4xl md:text-5xl font-black mb-2 tracking-tight">
-            R{balance.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            R{walletBalance.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </h1>
           <div className="flex items-center gap-4 mt-4">
             <div className="flex-1">
@@ -212,7 +422,11 @@ export function Swop() {
               type="button"
               variant="outline"
               className="w-full gap-2 font-semibold"
-              onClick={() => setShowQrModal(true)}
+              onClick={() => {
+                setQrContext("send")
+                setQrMode("scan")
+                setShowQrModal(true)
+              }}
             >
               <QrCode className="h-5 w-5" />
               Pay using QR Code
@@ -256,6 +470,56 @@ export function Swop() {
               </div>
             </div>
 
+            {paymentSummary && confirmationStage !== "idle" && (
+              <div className="rounded-2xl border-2 border-border/80 bg-background/80 p-4 space-y-4 shadow-xl">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground">Ready to send</p>
+                    <p className="text-xl font-black">@{paymentSummary.recipient.replace("@", "")}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-muted-foreground font-semibold">Amount</p>
+                    <p className="text-2xl font-black">
+                      R{paymentSummary.amount.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                </div>
+
+                {confirmationStage === "summary" && (
+                  <div className="space-y-3">
+                    <p className="text-sm text-muted-foreground">
+                      Both devices will show this summary. Confirm to trigger the animated payout.
+                    </p>
+                    <div className="flex gap-3">
+                      <Button className="flex-1 h-12 font-bold heatwave-gradient text-white border-0" onClick={confirmPayment}>
+                        Confirm & Send
+                      </Button>
+                      <Button
+                        className="h-12 font-semibold"
+                        variant="outline"
+                        onClick={() => {
+                          setConfirmationStage("idle")
+                          setPaymentSummary(null)
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {confirmationStage === "processing" && <PaymentAnimation label="Processing payment securely..." />}
+
+                {confirmationStage === "success" && (
+                  <div className="text-center space-y-2">
+                    <div className="text-4xl">✅</div>
+                    <p className="font-semibold">Payment sent!</p>
+                    <p className="text-sm text-muted-foreground">Wallet updated instantly.</p>
+                  </div>
+                )}
+              </div>
+            )}
+
             <Button
               size="lg"
               className="w-full h-14 gap-2 heatwave-gradient border-0 text-white font-bold hover:opacity-90 shadow-xl"
@@ -288,7 +552,59 @@ export function Swop() {
               <QrCode className="h-5 w-5" />
               Share QR Code
             </Button>
+            <Button
+              size="lg"
+              className="w-full h-14 gap-2 heatwave-gradient text-white border-0 font-bold"
+              onClick={() => {
+                setQrContext("receive")
+                setQrMode("scan")
+                setShowQrModal(true)
+                setIncomingStage("idle")
+                setIncomingSummary(null)
+              }}
+            >
+              <ArrowRightLeft className="h-5 w-5" />
+              Scan Incoming Payment
+            </Button>
           </div>
+
+          {incomingSummary && incomingStage !== "idle" && (
+            <div className="rounded-2xl border-2 border-border/80 bg-background/80 p-4 space-y-4 shadow-xl">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground">Incoming from</p>
+                  <p className="text-xl font-black">{incomingSummary.sender}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-muted-foreground font-semibold">Amount</p>
+                  <p className="text-2xl font-black">
+                    R{incomingSummary.amount.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                </div>
+              </div>
+
+              {incomingStage === "summary" && (
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    We instantly bumped your balance so you can keep it moving while the sender confirms.
+                  </p>
+                  <Button className="w-full h-12 font-bold heatwave-gradient text-white border-0" onClick={acknowledgeIncoming}>
+                    Confirm Receipt
+                  </Button>
+                </div>
+              )}
+
+              {incomingStage === "processing" && <PaymentAnimation label="Syncing both devices..." />}
+
+              {incomingStage === "success" && (
+                <div className="text-center space-y-2">
+                  <div className="text-4xl">🎉</div>
+                  <p className="font-semibold">Payment received!</p>
+                  <p className="text-sm text-muted-foreground">Wallet already updated.</p>
+                </div>
+              )}
+            </div>
+          )}
         </Card>
       )}
 
@@ -409,32 +725,70 @@ export function Swop() {
                 Point your camera at a payment QR or paste the payload below. We'll pre-fill the recipient and amount.
               </p>
             </div>
-            <label className="flex flex-col items-center justify-center border-2 border-dashed border-border rounded-2xl p-6 cursor-pointer text-center gap-3 hover:border-primary transition">
-              <QrCode className="h-10 w-10 text-primary" />
-              <span className="text-sm font-semibold">Upload QR Image</span>
-              <input type="file" accept="image/*" className="hidden" onChange={handleQrFile} />
-            </label>
-            {qrPreview && (
-              <div className="rounded-2xl overflow-hidden border border-border">
-                <img src={qrPreview} alt="QR preview" className="w-full h-48 object-cover" />
-              </div>
-            )}
-            <div className="space-y-2">
-              <Label className="text-sm font-semibold">QR Payload</Label>
-              <textarea
-                rows={4}
-                className="w-full rounded-xl border border-border bg-background/70 p-3 text-sm"
-                placeholder="Example: @alexj|250"
-                value={qrPayload}
-                onChange={(e) => setQrPayload(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">
-                We currently support payloads formatted as <strong>username|amount</strong>. Amount is optional.
-              </p>
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                variant={qrMode === "scan" ? "default" : "outline"}
+                className="h-12 font-semibold"
+                onClick={() => setQrMode("scan")}
+              >
+                Live Camera
+              </Button>
+              <Button
+                variant={qrMode === "upload" ? "default" : "outline"}
+                className="h-12 font-semibold"
+                onClick={() => setQrMode("upload")}
+              >
+                Upload / Paste
+              </Button>
             </div>
-            <Button className="w-full heatwave-gradient border-0 text-white font-bold" onClick={applyQrPayload}>
-              Apply QR Details
-            </Button>
+
+            {qrMode === "scan" ? (
+              <div className="space-y-3">
+                <div className="rounded-2xl border-2 border-dashed border-border overflow-hidden relative h-64">
+                  <video ref={videoRef} className="w-full h-full object-cover" muted playsInline autoPlay />
+                  {!isScanning && (
+                    <div className="absolute inset-0 flex items-center justify-center text-sm font-semibold text-muted-foreground">
+                      Initializing camera...
+                    </div>
+                  )}
+                  <div className="absolute inset-6 border-2 border-white/60 rounded-2xl animate-pulse pointer-events-none" />
+                </div>
+                <p className="text-xs text-muted-foreground text-center">
+                  {scanError
+                    ? scanError
+                    : "Align the QR inside the frame. We'll capture it instantly and close this window."}
+                </p>
+              </div>
+            ) : (
+              <>
+                <label className="flex flex-col items-center justify-center border-2 border-dashed border-border rounded-2xl p-6 cursor-pointer text-center gap-3 hover:border-primary transition">
+                  <QrCode className="h-10 w-10 text-primary" />
+                  <span className="text-sm font-semibold">Upload QR Image</span>
+                  <input type="file" accept="image/*" className="hidden" onChange={handleQrFile} />
+                </label>
+                {qrPreview && (
+                  <div className="rounded-2xl overflow-hidden border border-border">
+                    <img src={qrPreview} alt="QR preview" className="w-full h-48 object-cover" />
+                  </div>
+                )}
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold">QR Payload</Label>
+                  <textarea
+                    rows={4}
+                    className="w-full rounded-xl border border-border bg-background/70 p-3 text-sm"
+                    placeholder="Example: @alexj|250"
+                    value={qrPayload}
+                    onChange={(e) => setQrPayload(e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    We currently support payloads formatted as <strong>username|amount</strong>. Amount is optional.
+                  </p>
+                </div>
+                <Button className="w-full heatwave-gradient border-0 text-white font-bold" onClick={applyQrPayload}>
+                  Apply QR Details
+                </Button>
+              </>
+            )}
           </Card>
         </div>
       )}

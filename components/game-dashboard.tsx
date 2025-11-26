@@ -44,35 +44,64 @@ export function GameDashboard({ activeTab: externalActiveTab, onTabChange }: Gam
   const activeLoan = userProfile?.activeLoan || false
   const completedLoans = userProfile?.completedLoans || 12
   const [showHistory, setShowHistory] = useState(false)
-  const currentTheme = userProfile?.theme || "sunset"
+  const [showProfile, setShowProfile] = useState(false)
+  const [currentTheme, setCurrentTheme] = useState("sunset")
+  const [darkMode, setDarkMode] = useState(true)
   const [showThemeSelector, setShowThemeSelector] = useState(false)
-  const isDarkMode = userProfile?.darkMode !== undefined ? userProfile.darkMode : true
   const userName = userProfile?.userName || "Player One"
   const [internalTab, setInternalTab] = useState("dashboard")
   
   // Use external tab if provided, otherwise use internal state
   const activeTab = externalActiveTab || internalTab
-  const handleTabChange = (tab: string) => {
+  const handleTabsChange = (tab: string) => {
+    setInternalTab(tab)
+  }
+
+  const notifyNavChange = (tab: string) => {
     if (onTabChange) {
       onTabChange(tab)
-    } else {
-      setInternalTab(tab)
+    } else if (tab === "home") {
+      setInternalTab("dashboard")
     }
   }
 
+  const openHistoryView = () => {
+    setShowHistory(true)
+    setShowProfile(false)
+    notifyNavChange("history")
+  }
+
+  const closeHistoryView = () => {
+    setShowHistory(false)
+    notifyNavChange("home")
+  }
+
+  const closeProfileView = () => {
+    setShowProfile(false)
+    notifyNavChange("home")
+  }
+
   useEffect(() => {
-    // Apply theme and dark mode from user profile or localStorage
-    const theme = userProfile?.theme || localStorage.getItem("theme") || "sunset"
-    const darkMode = userProfile?.darkMode !== undefined 
-      ? userProfile.darkMode 
-      : localStorage.getItem("darkMode") === "true"
-    
-    document.documentElement.className = `theme-${theme} ${darkMode ? "dark" : ""}`
+    if (typeof window === "undefined") return
+    const savedTheme = userProfile?.theme || localStorage.getItem("theme") || "sunset"
+    const storedDarkMode =
+      userProfile?.darkMode !== undefined
+        ? userProfile.darkMode
+        : (localStorage.getItem("darkMode") ?? "true") === "true"
+    setCurrentTheme(savedTheme)
+    setDarkMode(storedDarkMode)
   }, [userProfile])
 
+  useEffect(() => {
+    if (typeof document === "undefined") return
+    document.documentElement.className = `theme-${currentTheme} ${darkMode ? "dark" : ""}`
+  }, [currentTheme, darkMode])
+
   const applyTheme = async (themeId: string) => {
-    localStorage.setItem("theme", themeId)
-    document.documentElement.className = `theme-${themeId} ${isDarkMode ? "dark" : ""}`
+    if (typeof window !== "undefined") {
+      localStorage.setItem("theme", themeId)
+    }
+    setCurrentTheme(themeId)
     
     // Save to Firebase if user is authenticated
     if (user?.uid) {
@@ -85,9 +114,11 @@ export function GameDashboard({ activeTab: externalActiveTab, onTabChange }: Gam
   }
 
   const toggleDarkMode = async () => {
-    const newMode = !isDarkMode
-    localStorage.setItem("darkMode", String(newMode))
-    document.documentElement.className = `theme-${currentTheme} ${newMode ? "dark" : ""}`
+    const newMode = !darkMode
+    if (typeof window !== "undefined") {
+      localStorage.setItem("darkMode", String(newMode))
+    }
+    setDarkMode(newMode)
     
     // Save to Firebase if user is authenticated
     if (user?.uid) {
@@ -123,30 +154,38 @@ export function GameDashboard({ activeTab: externalActiveTab, onTabChange }: Gam
 
   // Handle bottom nav tab changes
   useEffect(() => {
-    if (activeTab === "swop") {
-      // $SWOP view is handled in main render
-    } else if (activeTab === "wallet") {
-      handleTabChange("wallet")
-    } else if (activeTab === "history") {
-      setShowHistory(true)
-    } else if (activeTab === "home") {
-      handleTabChange("dashboard")
-      setShowHistory(false)
-    } else if (activeTab === "profile") {
-      // Profile view - can be implemented later
-      handleTabChange("dashboard")
+    if (!externalActiveTab) return
+    switch (externalActiveTab) {
+      case "history":
+        setShowHistory(true)
+        setShowProfile(false)
+        break
+      case "profile":
+        setShowProfile(true)
+        setShowHistory(false)
+        break
+      case "wallet":
+        setInternalTab("wallet")
+        setShowHistory(false)
+        setShowProfile(false)
+        break
+      case "home":
+        setInternalTab("dashboard")
+        setShowHistory(false)
+        setShowProfile(false)
+        break
+      default:
+        setShowHistory(false)
+        setShowProfile(false)
+        break
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab])
+  }, [externalActiveTab])
 
   if (showHistory) {
     return (
       <div className="min-h-screen p-4 pb-20 max-w-2xl mx-auto">
         <div className="flex items-center gap-3 mb-6">
-          <Button size="icon" variant="ghost" onClick={() => {
-            setShowHistory(false)
-            handleTabChange("home")
-          }}>
+          <Button size="icon" variant="ghost" onClick={closeHistoryView}>
             <ChevronRight className="h-5 w-5 rotate-180" />
           </Button>
           <div>
@@ -155,6 +194,82 @@ export function GameDashboard({ activeTab: externalActiveTab, onTabChange }: Gam
           </div>
         </div>
         <TransactionHistory />
+      </div>
+    )
+  }
+
+  if (showProfile) {
+    return (
+      <div className="min-h-screen p-4 pb-24 max-w-2xl mx-auto space-y-5">
+        <div className="flex items-center gap-3">
+          <Button size="icon" variant="ghost" onClick={closeProfileView}>
+            <ChevronRight className="h-5 w-5 rotate-180" />
+          </Button>
+          <div>
+            <h2 className="text-xl font-bold">Profile & Preferences</h2>
+            <p className="text-sm text-muted-foreground">Tweak your look and feel</p>
+          </div>
+        </div>
+
+        <Card className="p-5 space-y-3 bg-card/80 backdrop-blur-xl border-2 shadow-xl">
+          <div className="flex items-center gap-4">
+            <div className="h-14 w-14 rounded-2xl heatwave-gradient text-white font-black text-2xl flex items-center justify-center">
+              {userName?.slice(0, 2).toUpperCase()}
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground font-semibold">Signed in as</p>
+              <p className="text-lg font-bold">{userName}</p>
+              <p className="text-sm text-muted-foreground">{user?.email}</p>
+            </div>
+          </div>
+          <div className="flex items-center justify-between pt-3 border-t border-border">
+            <div>
+              <p className="text-sm font-semibold">Dark mode</p>
+              <p className="text-xs text-muted-foreground">Tap to toggle instantly</p>
+            </div>
+            <Button variant="outline" className="gap-2 font-bold" onClick={toggleDarkMode}>
+              {darkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              {darkMode ? "Lights on" : "Lights off"}
+            </Button>
+          </div>
+        </Card>
+
+        <Card className="p-5 bg-card/80 backdrop-blur-xl border-2 shadow-xl">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="p-2 rounded-lg heatwave-gradient">
+              <Palette className="h-4 w-4 text-white" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-bold text-sm">Choose Your Style</h3>
+              <p className="text-xs text-muted-foreground">Matches the selector from home</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            {themes.map((theme) => (
+              <button
+                key={theme.id}
+                onClick={() => applyTheme(theme.id)}
+                className={`relative aspect-square rounded-xl overflow-hidden border-2 transition-all ${
+                  currentTheme === theme.id
+                    ? "border-primary scale-105 shadow-xl"
+                    : "border-border hover:border-muted-foreground hover:scale-105"
+                }`}
+              >
+                <div
+                  style={{
+                    background: `linear-gradient(135deg, ${theme.colors[0]} 0%, ${theme.colors[1]} 50%, ${theme.colors[2]} 100%)`,
+                  }}
+                  className="absolute inset-0"
+                />
+                {currentTheme === theme.id && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                    <div className="h-5 w-5 rounded-full bg-white shadow-lg" />
+                  </div>
+                )}
+              </button>
+            ))}
+          </div>
+        </Card>
       </div>
     )
   }
@@ -178,7 +293,7 @@ export function GameDashboard({ activeTab: externalActiveTab, onTabChange }: Gam
         </div>
         <div className="flex gap-2">
           <Button size="icon" variant="ghost" className="rounded-full" onClick={toggleDarkMode}>
-            {isDarkMode ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+            {darkMode ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
           </Button>
           <Button
             size="icon"
@@ -188,7 +303,7 @@ export function GameDashboard({ activeTab: externalActiveTab, onTabChange }: Gam
           >
             <Palette className="h-5 w-5" />
           </Button>
-          <Button size="icon" variant="ghost" className="rounded-full" onClick={() => setShowHistory(true)}>
+          <Button size="icon" variant="ghost" className="rounded-full" onClick={openHistoryView}>
             <History className="h-5 w-5" />
           </Button>
         </div>
@@ -268,7 +383,7 @@ export function GameDashboard({ activeTab: externalActiveTab, onTabChange }: Gam
         )}
       </Card>
 
-      <Tabs value={activeTab === "wallet" ? "wallet" : activeTab === "dashboard" ? "dashboard" : "dashboard"} onValueChange={handleTabChange} className="w-full">
+      <Tabs value={internalTab} onValueChange={handleTabsChange} className="w-full">
         <TabsList className="grid w-full grid-cols-4 mb-6 bg-secondary/50 hidden md:grid">
           <TabsTrigger value="dashboard">Home</TabsTrigger>
           <TabsTrigger value="loans">Loans</TabsTrigger>
@@ -327,7 +442,7 @@ export function GameDashboard({ activeTab: externalActiveTab, onTabChange }: Gam
           <Card className="p-6 bg-gradient-to-br from-card to-secondary/30 backdrop-blur-sm border-0 shadow-lg">
             <div className="flex items-center justify-between mb-5">
               <h3 className="font-black text-xl">Recent Activity</h3>
-              <Button variant="ghost" size="sm" className="gap-1.5 h-9 font-bold" onClick={() => setShowHistory(true)}>
+          <Button variant="ghost" size="sm" className="gap-1.5 h-9 font-bold" onClick={openHistoryView}>
                 View All
                 <ChevronRight className="h-4 w-4" />
               </Button>
