@@ -431,6 +431,8 @@ export function AvatarDisplay({
                 interaction-prompt="none"
                 exposure="1"
                 shadow-intensity="0.8"
+                camera-target="0m 1.4m 0m"
+                camera-orbit="0deg 90deg 2m"
                 style={{ width: "100%", height: "100%", background: "transparent" }}
               />
             ) : (

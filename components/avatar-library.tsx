@@ -64,11 +64,17 @@ export function AvatarLibrary({
                     activeUrl === avatar.url ? "border-primary shadow-xl" : "border-border hover:border-primary"
                   } bg-card/80 backdrop-blur-md overflow-hidden text-left`}
                 >
-                  <div className="aspect-square w-full overflow-hidden bg-secondary">
-                    <img
-                      src={avatar.previewUrl || getAvatarPreviewUrl(avatar.url)}
-                      alt="Saved avatar"
-                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                  <div className="aspect-square w-full overflow-hidden bg-secondary relative">
+                    <model-viewer
+                      src={`${avatar.url}?quality=medium`}
+                      poster={avatar.previewUrl || getAvatarPreviewUrl(avatar.url)}
+                      camera-controls
+                      auto-rotate
+                      interaction-prompt="none"
+                      disable-zoom
+                      shadow-intensity="0.6"
+                      exposure="1"
+                      style={{ width: "100%", height: "100%", background: "transparent" }}
                     />
                   </div>
                   <div className="p-4 flex items-center justify-between">
