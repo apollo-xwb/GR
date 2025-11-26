@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useAuth } from "@/contexts/auth-context"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -12,6 +13,7 @@ interface WalletConnectionProps {
 }
 
 export function BlockchainWallet({ onConnect }: WalletConnectionProps) {
+  const { userProfile } = useAuth()
   const [isConnected, setIsConnected] = useState(false)
   const [walletAddress, setWalletAddress] = useState("")
   const [isConnecting, setIsConnecting] = useState(false)
@@ -183,7 +185,38 @@ export function BlockchainWallet({ onConnect }: WalletConnectionProps) {
   }
 
   return (
-    <Card className="glass-card p-6">
+    <Card className="glass-card p-6 space-y-6">
+      <div className="flex items-center gap-4 p-4 rounded-2xl bg-gradient-to-r from-primary/20 via-secondary/10 to-accent/20 border border-border/60">
+        <div className="h-16 w-16 rounded-2xl bg-black/60 flex items-center justify-center overflow-hidden">
+          {userProfile?.readyPlayerMeAvatarPreview ? (
+            <img
+              src={userProfile.readyPlayerMeAvatarPreview}
+              alt="Avatar"
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <div className="h-12 w-12 rounded-full bg-primary/40 flex items-center justify-center text-lg font-bold text-primary-foreground">
+              {userProfile?.userName?.slice(0, 2).toUpperCase() || "P1"}
+            </div>
+          )}
+        </div>
+        <div className="flex-1">
+          <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wide">Player streak</p>
+          <p className="text-sm font-bold">
+            {userProfile?.loanStreak ?? 0} perfect {userProfile?.loanStreak === 1 ? "cycle" : "cycles"} in a row
+          </p>
+          <p className="text-[11px] text-muted-foreground">
+            Keep closing loans within 72 hours to boost your reputation and unlock more Web3 perks.
+          </p>
+        </div>
+        <div className="text-right">
+          <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wide">XP</p>
+          <p className="text-lg font-bold">
+            {(userProfile?.xp ?? 0).toLocaleString()}
+          </p>
+        </div>
+      </div>
+
       <div className="text-center">
         <div className="h-20 w-20 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 mx-auto mb-4 flex items-center justify-center">
           <Wallet className="h-10 w-10 text-primary" />

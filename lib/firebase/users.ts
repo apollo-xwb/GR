@@ -57,8 +57,13 @@ export const getUserProfile = async (uid: string): Promise<UserProfile | null> =
             .sort((a, b) => b.savedAt.getTime() - a.savedAt.getTime())
         : []
 
+      const resolvedPreview =
+        data.readyPlayerMeAvatarPreview ||
+        (data.readyPlayerMeAvatar ? getAvatarPreviewUrl(data.readyPlayerMeAvatar) : null)
+
       return {
         ...data,
+        readyPlayerMeAvatarPreview: resolvedPreview,
         readyPlayerMeAvatars,
         createdAt: data.createdAt?.toDate() || new Date(),
         updatedAt: data.updatedAt?.toDate() || new Date(),

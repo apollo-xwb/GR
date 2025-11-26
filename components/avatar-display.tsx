@@ -366,16 +366,16 @@ export function AvatarDisplay({
   const xpPercent = Math.min(100, Math.max(0, (xp / maxXp) * 100))
   const cameraConfig = isCompactViewport
     ? {
-        height: "h-[520px] sm:h-[580px]",
-        target: "0m 1.1m 0m",
-        orbit: "0deg 82deg 3.2m",
-        fov: "30deg",
+        height: "h-[440px] sm:h-[480px]",
+        target: "0m 0.85m 0m",
+        orbit: "0deg 86deg 3.7m",
+        fov: "29deg",
       }
     : {
-        height: "h-[600px] sm:h-[660px] lg:h-[720px]",
-        target: "0m 0.8m 0m",
-        orbit: "0deg 78deg 4m",
-        fov: "24deg",
+        height: "h-[500px] sm:h-[540px] lg:h-[580px]",
+        target: "0m 0.75m 0m",
+        orbit: "0deg 82deg 4.2m",
+        fov: "27deg",
       }
 
   return (
@@ -444,7 +444,7 @@ export function AvatarDisplay({
 
             <div className="order-1 lg:order-2">
               <div className={`relative ${cameraConfig.height} flex items-center justify-center`}>
-                <div className="absolute bottom-10 w-56 h-12 bg-black/40 blur-3xl rounded-full opacity-60" />
+                <div className="absolute bottom-6 w-40 h-10 bg-black/40 blur-2xl rounded-full opacity-60" />
             {isLoading ? (
               <div className="flex flex-col items-center gap-3 text-white">
                 <Loader2 className="h-16 w-16 animate-spin" />

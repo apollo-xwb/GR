@@ -17,6 +17,7 @@ import {
   Palette,
   Sun,
   Moon,
+  Wallet,
 } from "lucide-react"
 import { AvatarDisplay } from "./avatar-display"
 import { LoanManagement } from "./loan-management"
@@ -27,6 +28,8 @@ import { Swop } from "./swop"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useAuth } from "@/contexts/auth-context"
 import { updateUserPreferences } from "@/lib/firebase/users"
+import { signOutUser } from "@/lib/firebase/auth"
+import { toast } from "sonner"
 
 interface GameDashboardProps {
   activeTab?: string
@@ -43,13 +46,16 @@ export function GameDashboard({ activeTab: externalActiveTab, onTabChange }: Gam
   const loanLimit = userProfile?.loanLimit || 1000
   const activeLoan = userProfile?.activeLoan || false
   const completedLoans = userProfile?.completedLoans || 12
+  const loanStreak = userProfile?.loanStreak ?? 12
   const [showHistory, setShowHistory] = useState(false)
   const [showProfile, setShowProfile] = useState(false)
+  const [historyFromNav, setHistoryFromNav] = useState(false)
   const [currentTheme, setCurrentTheme] = useState("sunset")
   const [darkMode, setDarkMode] = useState(true)
   const [showThemeSelector, setShowThemeSelector] = useState(false)
   const userName = userProfile?.userName || "Player One"
   const [internalTab, setInternalTab] = useState("dashboard")
+  const swopBalance = userProfile?.swopBalance ?? 0
   
   // Use external tab if provided, otherwise use internal state
   const activeTab = externalActiveTab || internalTab
@@ -68,6 +74,7 @@ export function GameDashboard({ activeTab: externalActiveTab, onTabChange }: Gam
   const openHistoryView = () => {
     setShowHistory(true)
     setShowProfile(false)
+    setHistoryFromNav(false)
     notifyNavChange("history")
   }
 
@@ -130,6 +137,17 @@ export function GameDashboard({ activeTab: externalActiveTab, onTabChange }: Gam
     }
   }
 
+  const handleSignOut = async () => {
+    try {
+      await signOutUser()
+      toast.success("Signed out")
+      notifyNavChange("home")
+    } catch (error) {
+      console.error("Error signing out:", error)
+      toast.error("Failed to sign out. Please try again.")
+    }
+  }
+
   const getAvatarEmote = () => {
     if (!activeLoan) return "idle" // No loan - neutral
     if (activeLoan && completedLoans > 10) return "happy" // Active loan, good history
@@ -159,6 +177,7 @@ export function GameDashboard({ activeTab: externalActiveTab, onTabChange }: Gam
       case "history":
         setShowHistory(true)
         setShowProfile(false)
+        setHistoryFromNav(true)
         break
       case "profile":
         setShowProfile(true)
@@ -183,11 +202,13 @@ export function GameDashboard({ activeTab: externalActiveTab, onTabChange }: Gam
 
   if (showHistory) {
     return (
-      <div className="min-h-screen p-4 pb-20 max-w-2xl mx-auto">
+      <div className="min-h-screen p-4 pb-20 max-w-2xl mx-auto safe-area-page">
         <div className="flex items-center gap-3 mb-6">
-          <Button size="icon" variant="ghost" onClick={closeHistoryView}>
-            <ChevronRight className="h-5 w-5 rotate-180" />
-          </Button>
+          {!historyFromNav && (
+            <Button size="icon" variant="ghost" onClick={closeHistoryView}>
+              <ChevronRight className="h-5 w-5 rotate-180" />
+            </Button>
+          )}
           <div>
             <h2 className="text-xl font-bold">Transaction History</h2>
             <p className="text-sm text-muted-foreground">View all your activity</p>
@@ -213,8 +234,16 @@ export function GameDashboard({ activeTab: externalActiveTab, onTabChange }: Gam
 
         <Card className="p-5 space-y-3 bg-card/80 backdrop-blur-xl border-2 shadow-xl">
           <div className="flex items-center gap-4">
-            <div className="h-14 w-14 rounded-2xl heatwave-gradient text-white font-black text-2xl flex items-center justify-center">
-              {userName?.slice(0, 2).toUpperCase()}
+            <div className="h-14 w-14 rounded-2xl heatwave-gradient text-white font-black text-2xl flex items-center justify-center overflow-hidden">
+              {userProfile?.readyPlayerMeAvatarPreview ? (
+                <img
+                  src={userProfile.readyPlayerMeAvatarPreview}
+                  alt="Avatar"
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <span>{userName?.slice(0, 2).toUpperCase()}</span>
+              )}
             </div>
             <div>
               <p className="text-xs text-muted-foreground font-semibold">Signed in as</p>
@@ -231,6 +260,46 @@ export function GameDashboard({ activeTab: externalActiveTab, onTabChange }: Gam
               {darkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
               {darkMode ? "Lights on" : "Lights off"}
             </Button>
+          </div>
+        </Card>
+
+        <Card className="p-5 bg-card/80 backdrop-blur-xl border-2 shadow-xl space-y-4">
+          <div className="flex items-center justify-between mb-1">
+            <div>
+              <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wide">Game status</p>
+              <p className="text-lg font-bold">Tier, XP & streak</p>
+            </div>
+            <Badge className="heatwave-gradient border-0 text-white font-bold px-3 py-1 text-xs">
+              {tier} · L{Math.floor(xp / 500)} · Streak {loanStreak}
+            </Badge>
+          </div>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">XP progress</span>
+              <span className="font-mono font-semibold">
+                {xp.toLocaleString()}/{maxXP.toLocaleString()}
+              </span>
+            </div>
+            <div className="h-2 bg-muted rounded-full overflow-hidden">
+              <div
+                className="h-full heatwave-gradient"
+                style={{ width: `${Math.min(100, (xp / maxXP) * 100)}%` }}
+              />
+            </div>
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>Completed loans</span>
+              <span>{completedLoans}</span>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3 pt-2 border-t border-border/80 mt-2">
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">Loan limit</p>
+              <p className="text-lg font-bold">R{loanLimit.toLocaleString()}</p>
+            </div>
+            <div className="space-y-1 text-right">
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">$SWOP balance</p>
+              <p className="text-lg font-bold">R{swopBalance.toLocaleString()}</p>
+            </div>
           </div>
         </Card>
 
@@ -270,6 +339,25 @@ export function GameDashboard({ activeTab: externalActiveTab, onTabChange }: Gam
             ))}
           </div>
         </Card>
+
+        <Card className="p-5 bg-card/80 backdrop-blur-xl border-2 shadow-xl space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wide">Security</p>
+              <p className="text-lg font-bold">Sign out</p>
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            You’ll be returned to the login screen. Your progress, avatar and balances stay saved to your profile.
+          </p>
+          <Button
+            variant="destructive"
+            className="w-full font-bold h-11"
+            onClick={handleSignOut}
+          >
+            Sign out
+          </Button>
+        </Card>
       </div>
     )
   }
@@ -283,9 +371,14 @@ export function GameDashboard({ activeTab: externalActiveTab, onTabChange }: Gam
     <div className="min-h-screen p-3 sm:p-4 pb-20 sm:pb-24 max-w-2xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <Badge className="heatwave-gradient border-0 px-3 py-1 font-bold text-white shadow-lg">
-            Level {Math.floor(xp / 500)}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge className="heatwave-gradient border-0 px-3 py-1 font-bold text-white shadow-lg">
+              Level {Math.floor(xp / 500)}
+            </Badge>
+            <Badge variant="outline" className="border-primary/40 text-xs font-semibold">
+              Streak: {loanStreak}
+            </Badge>
+          </div>
           <div>
             <p className="text-sm text-muted-foreground font-semibold">Welcome back</p>
             <h2 className="text-lg font-bold">{userName}</h2>
@@ -351,37 +444,79 @@ export function GameDashboard({ activeTab: externalActiveTab, onTabChange }: Gam
         </Card>
       )}
 
-      <AvatarDisplay tier={tier} xp={xp} maxXp={maxXP} emoteState={getAvatarEmote()} activeLoan={activeLoan} />
+      {internalTab === "dashboard" && (
+        <>
+          <AvatarDisplay
+            tier={tier}
+            xp={xp}
+            maxXp={maxXP}
+            emoteState={getAvatarEmote()}
+            activeLoan={activeLoan}
+          />
 
-      <Card className="p-6 mt-6 mb-5 bg-gradient-to-br from-card to-secondary/30 backdrop-blur-sm border-0 shadow-lg">
-        <div className="flex items-center justify-between mb-5">
-          <div className="flex-1">
-            <p className="text-sm text-muted-foreground mb-2 font-medium">Available Loan Limit</p>
-            <p className="text-5xl font-bold tracking-tight heatwave-text">R{loanLimit.toLocaleString()}</p>
-          </div>
-          <div className="p-4 rounded-2xl heatwave-gradient shadow-lg">
-            <Trophy className="h-10 w-10 text-white" />
-          </div>
-        </div>
-        {!activeLoan ? (
-          <Button
-            className="w-full gap-2 heatwave-gradient border-0 text-white font-bold h-14 hover:opacity-90 transition-opacity shadow-lg text-base"
-            size="lg"
-          >
-            <Zap className="h-5 w-5" />
-            Request Loan Now
-          </Button>
-        ) : (
-          <div className="flex items-center gap-3 p-5 bg-secondary/50 rounded-2xl border-2 border-border shadow-inner">
-            <Clock className="h-6 w-6 heatwave-text flex-shrink-0" />
-            <div className="flex-1">
-              <p className="text-base font-bold">Active Loan</p>
-              <p className="text-sm text-muted-foreground">48 hours remaining</p>
+          <Card className="p-6 mt-4 mb-5 bg-gradient-to-br from-card to-secondary/30 backdrop-blur-sm border-0 shadow-lg">
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex-1">
+                <p className="text-sm text-muted-foreground mb-2 font-medium">Available Loan Limit</p>
+                <p className="text-5xl font-bold tracking-tight heatwave-text">R{loanLimit.toLocaleString()}</p>
+              </div>
+              <div className="p-4 rounded-2xl heatwave-gradient shadow-lg">
+                <Trophy className="h-10 w-10 text-white" />
+              </div>
             </div>
-            <Badge className="heatwave-gradient border-0 text-white px-3 py-1.5 font-semibold">Active</Badge>
+            {!activeLoan ? (
+              <Button
+                className="w-full gap-2 heatwave-gradient border-0 text-white font-bold h-14 hover:opacity-90 transition-opacity shadow-lg text-base"
+                size="lg"
+              >
+                <Zap className="h-5 w-5" />
+                Request Loan Now
+              </Button>
+            ) : (
+              <div className="flex items-center gap-3 p-5 bg-secondary/50 rounded-2xl border-2 border-border shadow-inner">
+                <Clock className="h-6 w-6 heatwave-text flex-shrink-0" />
+                <div className="flex-1">
+                  <p className="text-base font-bold">Active Loan</p>
+                  <p className="text-sm text-muted-foreground">48 hours remaining</p>
+                </div>
+                <Badge className="heatwave-gradient border-0 text-white px-3 py-1.5 font-semibold">Active</Badge>
+              </div>
+            )}
+          </Card>
+        </>
+      )}
+
+      {internalTab === "wallet" && (
+        <Card className="p-6 mt-2 mb-5 bg-gradient-to-br from-secondary/40 via-secondary/10 to-background backdrop-blur-xl border border-border shadow-2xl">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.25em] text-muted-foreground">
+                Web3 & $SWOP
+              </p>
+              <h2 className="text-2xl font-black leading-tight">Your on-chain wallet hub</h2>
+            </div>
+            <div className="p-3 rounded-2xl heatwave-gradient shadow-lg">
+              <Wallet className="h-6 w-6 text-white" />
+            </div>
           </div>
-        )}
-      </Card>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="p-4 rounded-2xl bg-background/80 border border-border shadow-inner space-y-1">
+              <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wide">$SWOP balance</p>
+              <p className="text-2xl font-bold">
+                R{swopBalance.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </p>
+              <p className="text-[11px] text-muted-foreground">Spend in-game or cash out to card.</p>
+            </div>
+            <div className="p-4 rounded-2xl bg-background/80 border border-border shadow-inner space-y-1">
+              <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wide">Loan capacity</p>
+              <p className="text-2xl font-bold">R{loanLimit.toLocaleString()}</p>
+              <p className="text-[11px] text-muted-foreground">
+                Higher tiers unlock more instant liquidity.
+              </p>
+            </div>
+          </div>
+        </Card>
+      )}
 
       <Tabs value={internalTab} onValueChange={handleTabsChange} className="w-full">
         <TabsList className="grid w-full grid-cols-4 mb-6 bg-secondary/50 hidden md:grid">

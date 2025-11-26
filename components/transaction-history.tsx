@@ -166,7 +166,7 @@ export function TransactionHistory() {
     <div className="space-y-4">
       {/* Stats Overview */}
       <div className="grid grid-cols-2 gap-3">
-        <Card className="glass-card p-4">
+        <Card className="glass-card p-4 bg-gradient-to-br from-primary/10 via-background to-background border border-primary/20">
           <div className="flex items-center gap-2 mb-2">
             <Trophy className="h-4 w-4 text-primary" />
             <span className="text-xs text-muted-foreground">Total Loans</span>
@@ -176,7 +176,7 @@ export function TransactionHistory() {
           </p>
         </Card>
         
-        <Card className="glass-card p-4">
+        <Card className="glass-card p-4 bg-gradient-to-br from-secondary/10 via-background to-background border border-secondary/20">
           <div className="flex items-center gap-2 mb-2">
             <Zap className="h-4 w-4 text-[oklch(0.80_0.20_85)]" />
             <span className="text-xs text-muted-foreground">Total XP</span>
@@ -186,7 +186,7 @@ export function TransactionHistory() {
           </p>
         </Card>
         
-        <Card className="glass-card p-4">
+        <Card className="glass-card p-4 bg-gradient-to-br from-emerald-500/10 via-background to-background border border-emerald-500/30">
           <div className="flex items-center gap-2 mb-2">
             <TrendingUp className="h-4 w-4 text-accent" />
             <span className="text-xs text-muted-foreground">Total Borrowed</span>
@@ -196,7 +196,7 @@ export function TransactionHistory() {
           </p>
         </Card>
         
-        <Card className="glass-card p-4">
+        <Card className="glass-card p-4 bg-gradient-to-br from-amber-500/10 via-background to-background border border-amber-500/30">
           <div className="flex items-center gap-2 mb-2">
             <TrendingDown className="h-4 w-4 text-muted-foreground" />
             <span className="text-xs text-muted-foreground">Fees Paid</span>
@@ -209,11 +209,31 @@ export function TransactionHistory() {
 
       {/* Transaction Tabs */}
       <Tabs defaultValue="all" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="all" className="text-xs">All</TabsTrigger>
-          <TabsTrigger value="loans" className="text-xs">Loans</TabsTrigger>
-          <TabsTrigger value="xp" className="text-xs">XP</TabsTrigger>
-          <TabsTrigger value="fees" className="text-xs">Fees</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-4 bg-secondary/40 rounded-2xl p-1">
+          <TabsTrigger
+            value="all"
+            className="text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-xl"
+          >
+            All
+          </TabsTrigger>
+          <TabsTrigger
+            value="loans"
+            className="text-xs data-[state=active]:bg-emerald-500/90 data-[state=active]:text-white rounded-xl"
+          >
+            Loans
+          </TabsTrigger>
+          <TabsTrigger
+            value="xp"
+            className="text-xs data-[state=active]:bg-violet-500/90 data-[state=active]:text-white rounded-xl"
+          >
+            XP
+          </TabsTrigger>
+          <TabsTrigger
+            value="fees"
+            className="text-xs data-[state=active]:bg-amber-500/90 data-[state=active]:text-black rounded-xl"
+          >
+            Fees
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="all" className="space-y-4 mt-4">
@@ -223,7 +243,12 @@ export function TransactionHistory() {
             
             return (
               <div key={group}>
-                <h4 className="text-sm font-semibold mb-3 text-muted-foreground">{group}</h4>
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="inline-flex items-center rounded-full bg-secondary/70 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-foreground">
+                    {group}
+                  </span>
+                  <span className="h-px flex-1 bg-border" />
+                </div>
                 <div className="space-y-2">
                   {groupTxs.map(tx => (
                     <Card key={tx.id} className="glass-card p-4 hover:bg-secondary/50 transition-colors cursor-pointer">

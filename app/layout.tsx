@@ -69,16 +69,18 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark">
+      <head>
+        <Script
+          src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"
+          strategy="beforeInteractive"
+          type="module"
+        />
+      </head>
       <body className={`${outfit.variable} ${spaceGrotesk.variable} font-sans antialiased`}>
         {children}
         <Toaster />
         <Analytics />
       </body>
-      <Script
-        src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"
-        strategy="beforeInteractive"
-        type="module"
-      />
     </html>
   )
 }

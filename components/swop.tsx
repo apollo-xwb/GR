@@ -1,6 +1,7 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import dynamic from "next/dynamic"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -22,6 +23,12 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { BrowserQRCodeReader } from "@zxing/browser"
+import { QRCodeCanvas } from "qrcode.react"
+import { useAuth } from "@/contexts/auth-context"
+
+const LogoQRCode = dynamic(() => import("react-qrcode-logo").then((m) => m.QRCode), {
+  ssr: false,
+})
 
 const PaymentAnimation = ({ label }: { label: string }) => (
   <div className="flex flex-col items-center gap-4 py-6">
@@ -36,11 +43,17 @@ const PaymentAnimation = ({ label }: { label: string }) => (
 )
 
 export function Swop() {
+  const { userProfile } = useAuth()
   const [activeView, setActiveView] = useState<"send" | "receive" | "add" | "withdraw">("send")
   const [amount, setAmount] = useState("")
   const [recipient, setRecipient] = useState("")
   const [walletBalance, setWalletBalance] = useState(8700.46)
   const [cardBalance] = useState(2500)
+  const defaultHandle = userProfile?.userName?.startsWith("@")
+    ? userProfile.userName
+    : userProfile?.userName
+      ? `@${userProfile.userName}`
+      : "@playerone"
   const [showQrModal, setShowQrModal] = useState(false)
   const [qrContext, setQrContext] = useState<"send" | "receive">("send")
   const [qrMode, setQrMode] = useState<"upload" | "scan">("upload")
@@ -56,6 +69,52 @@ export function Swop() {
   const codeReaderRef = useRef<BrowserQRCodeReader | null>(null)
   const processingTimeout = useRef<NodeJS.Timeout | null>(null)
   const [lastScanValue, setLastScanValue] = useState<string | null>(null)
+  const [receiveAmount, setReceiveAmount] = useState("")
+  const qrCanvasRef = useRef<HTMLCanvasElement | null>(null)
+  const avatarPoster =
+    userProfile?.readyPlayerMeAvatarPreview || userProfile?.readyPlayerMeAvatar || "/placeholder-avatar.png"
+  const [isDarkMode, setIsDarkMode] = useState(true)
+  const [themeId, setThemeId] = useState("sunset")
+
+  const receivePayload = useMemo(() => {
+    const numericAmount = Number(receiveAmount)
+    if (receiveAmount.trim() && !Number.isNaN(numericAmount) && numericAmount > 0) {
+      return `${defaultHandle}|${numericAmount}`
+    }
+    return defaultHandle
+  }, [defaultHandle, receiveAmount])
+
+  const tileGradient = useMemo(() => {
+    if (isDarkMode) {
+      switch (themeId) {
+        case "ocean":
+          return "linear-gradient(135deg, #020617 0%, #0ea5e9 35%, #22c1c3 100%)"
+        case "aurora":
+          return "linear-gradient(135deg, #020617 0%, #8b5cf6 35%, #ec4899 100%)"
+        case "forest":
+          return "linear-gradient(135deg, #020617 0%, #22c55e 35%, #16a34a 100%)"
+        case "neon":
+          return "linear-gradient(135deg, #020617 0%, #ec4899 35%, #a855f7 100%)"
+        case "sunset":
+        default:
+          return "linear-gradient(135deg, #020617 0%, #f97316 40%, #facc15 100%)"
+      }
+    } else {
+      switch (themeId) {
+        case "ocean":
+          return "linear-gradient(135deg, #e0f2fe 0%, #38bdf8 40%, #0369a1 100%)"
+        case "aurora":
+          return "linear-gradient(135deg, #f5f3ff 0%, #a855f7 40%, #db2777 100%)"
+        case "forest":
+          return "linear-gradient(135deg, #dcfce7 0%, #22c55e 40%, #166534 100%)"
+        case "neon":
+          return "linear-gradient(135deg, #fdf2ff 0%, #ec4899 40%, #7e22ce 100%)"
+        case "sunset":
+        default:
+          return "linear-gradient(135deg, #fff7ed 0%, #fb923c 40%, #7c2d12 100%)"
+      }
+    }
+  }, [isDarkMode, themeId])
 
   const recentContacts = [
     { id: 1, name: "Alex Johnson", username: "@alexj", avatar: "👤" },
@@ -238,6 +297,32 @@ export function Swop() {
     }, 1400)
   }
 
+  const copyReceivePayload = async () => {
+    if (typeof navigator === "undefined" || !navigator.clipboard) {
+      toast.error("Clipboard not available")
+      return
+    }
+    try {
+      await navigator.clipboard.writeText(receivePayload)
+      toast.success("QR payload copied")
+    } catch {
+      toast.error("Unable to copy payload")
+    }
+  }
+
+  const downloadReceiveQr = () => {
+    if (typeof document === "undefined") return
+    if (!qrCanvasRef.current) {
+      toast.error("QR not ready yet")
+      return
+    }
+    const dataUrl = qrCanvasRef.current.toDataURL("image/png")
+    const link = document.createElement("a")
+    link.href = dataUrl
+    link.download = `swop-${defaultHandle.replace("@", "")}.png`
+    link.click()
+  }
+
   useEffect(() => {
     if (!showQrModal || typeof document === "undefined") return
     const body = document.body
@@ -254,6 +339,22 @@ export function Swop() {
       }
     }
   }, [showQrModal])
+
+  useEffect(() => {
+    if (typeof document === "undefined") return
+    const root = document.documentElement
+    const update = () => {
+      setIsDarkMode(root.classList.contains("dark"))
+      const themeClass = Array.from(root.classList).find((cls) => cls.startsWith("theme-"))
+      if (themeClass) {
+        setThemeId(themeClass.replace("theme-", ""))
+      }
+    }
+    update()
+    const observer = new MutationObserver(update)
+    observer.observe(root, { attributes: true, attributeFilter: ["class"] })
+    return () => observer.disconnect()
+  }, [])
 
   useEffect(() => {
     if (showQrModal && qrMode === "scan") {
@@ -535,23 +636,85 @@ export function Swop() {
 
       {/* Receive View */}
       {activeView === "receive" && (
-        <Card className="p-4 sm:p-6 bg-card/80 backdrop-blur-xl border-2 shadow-2xl space-y-4 sm:space-y-6">
-          <div className="text-center space-y-3 sm:space-y-4">
-            <div className="mx-auto w-48 h-48 sm:w-64 sm:h-64 rounded-2xl sm:rounded-3xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center border-4 heatwave-border">
-              <QrCode className="h-24 w-24 sm:h-32 sm:w-32 text-primary" />
+        <Card className="p-4 sm:p-6 bg-card/80 backdrop-blur-xl border-2 shadow-2xl space-y-5 sm:space-y-6">
+          <div className="space-y-1 text-center">
+            <Badge className="mx-auto heatwave-gradient border-0 text-white">Receive mode</Badge>
+            <h3 className="text-xl font-black">Show this QR to the sender</h3>
+            <p className="text-sm text-muted-foreground">We'll encode your handle and optional amount.</p>
+          </div>
+
+          <div className="space-y-3">
+            <Label className="text-sm font-semibold">Request amount (optional)</Label>
+            <div className="relative">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-semibold">R</span>
+              <Input
+                type="number"
+                value={receiveAmount}
+                onChange={(e) => setReceiveAmount(e.target.value)}
+                placeholder="0.00"
+                className="h-14 pl-10 text-xl font-bold border-2"
+              />
             </div>
-            <div>
-              <p className="text-sm text-muted-foreground mb-2 font-semibold">Your $SWOP Username</p>
-              <p className="text-2xl font-black heatwave-text">@playerone</p>
-            </div>
-            <Button
-              size="lg"
-              variant="outline"
-              className="w-full h-14 gap-2 font-bold"
+          </div>
+
+          <div className="flex flex-col items-center gap-4">
+            <div
+              className={`relative p-5 sm:p-8 rounded-[32px] shadow-[0_30px_80px_rgba(0,0,0,0.45)] border overflow-hidden`}
+              style={{ background: tileGradient }}
             >
-              <QrCode className="h-5 w-5" />
-              Share QR Code
-            </Button>
+              <LogoQRCode
+                value={receivePayload}
+                size={320}
+                quietZone={16}
+                ecLevel="H"
+                bgColor="transparent"
+                fgColor={isDarkMode ? "#FFFFFF" : "#020617"}
+                qrStyle="dots"
+                eyeRadius={[
+                  { outer: [16, 16, 4, 16], inner: [8, 8, 8, 8] },
+                  { outer: [16, 4, 16, 16], inner: [8, 8, 8, 8] },
+                  { outer: [4, 16, 16, 16], inner: [8, 8, 8, 8] },
+                ]}
+                logoImage={avatarPoster || undefined}
+                logoWidth={80}
+                logoHeight={80}
+                logoOpacity={0.95}
+                removeQrCodeBehindLogo
+              />
+              {/* Hidden crisp QR for downloads/scanning fallback */}
+              <QRCodeCanvas
+                ref={qrCanvasRef}
+                value={receivePayload}
+                size={320}
+                bgColor="#ffffff"
+                fgColor={isDarkMode ? "#000000" : "#000000"}
+                level="H"
+                includeMargin
+                style={{ position: "absolute", opacity: 0, pointerEvents: "none" }}
+              />
+            </div>
+            <div className="text-center">
+              <p className="text-xs text-muted-foreground font-semibold uppercase">Handle</p>
+              <p className="text-2xl font-black heatwave-text">{defaultHandle}</p>
+              {receivePayload.includes("|") && (
+                <p className="text-sm text-muted-foreground">Requesting R{receiveAmount}</p>
+              )}
+            </div>
+            <div className="grid w-full gap-2 sm:grid-cols-2">
+              <Button variant="outline" className="h-12 font-semibold gap-2" onClick={copyReceivePayload}>
+                <QrCode className="h-4 w-4" />
+                Copy Payload
+              </Button>
+              <Button
+                size="lg"
+                variant="secondary"
+                className="h-12 gap-2 font-bold"
+                onClick={downloadReceiveQr}
+              >
+                <ArrowDown className="h-4 w-4" />
+                Save QR
+              </Button>
+            </div>
             <Button
               size="lg"
               className="w-full h-14 gap-2 heatwave-gradient text-white border-0 font-bold"
@@ -564,7 +727,7 @@ export function Swop() {
               }}
             >
               <ArrowRightLeft className="h-5 w-5" />
-              Scan Incoming Payment
+              Scan someone else's QR
             </Button>
           </div>
 
