@@ -3,16 +3,80 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* Fonts are now loaded via next/font/local in layout.tsx */
-/* This ensures proper font loading and eliminates 404 errors */
-/* Font files should be placed in public/fonts/ directory */
-/* 
- * Required files:
- * - PowerGrotesk-Regular.woff2, PowerGrotesk-Medium.woff2, PowerGrotesk-SemiBold.woff2, PowerGrotesk-Bold.woff2
- * - BaseNeue-Regular.woff2, BaseNeue-Medium.woff2, BaseNeue-SemiBold.woff2, BaseNeue-Bold.woff2
- * 
- * Download Power Grotesk from: https://power-type.com/power-grotesk/
- */
+/* BaseNeue Font - Modern sans-serif for UI elements */
+@font-face {
+  font-family: 'BaseNeue';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/BaseNeueTrial-Regular.woff2') format('woff2'),
+       local('BaseNeue Regular');
+}
+
+@font-face {
+  font-family: 'BaseNeue';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/BaseNeueTrial-Medium.woff2') format('woff2'),
+       local('BaseNeue Medium');
+}
+
+@font-face {
+  font-family: 'BaseNeue';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/BaseNeueTrial-SemiBold.woff2') format('woff2'),
+       local('BaseNeue SemiBold');
+}
+
+@font-face {
+  font-family: 'BaseNeue';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/BaseNeueTrial-Bold.woff2') format('woff2'),
+       local('BaseNeue Bold');
+}
+
+/* Power Grotesk Font - Add font files to public/fonts/ directory */
+/* Download from https://power-type.com/power-grotesk/ */
+@font-face {
+  font-family: 'Power Grotesk';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/PowerGrotesk-Regular.woff2') format('woff2'),
+       local('Power Grotesk Regular');
+}
+
+@font-face {
+  font-family: 'Power Grotesk';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/PowerGrotesk-Medium.woff2') format('woff2'),
+       local('Power Grotesk Medium');
+}
+
+@font-face {
+  font-family: 'Power Grotesk';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/PowerGrotesk-Large.woff2') format('woff2'),
+       local('Power Grotesk Large');
+}
+
+@font-face {
+  font-family: 'Power Grotesk';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/PowerGrotesk-Large.woff2') format('woff2'),
+       local('Power Grotesk Large');
+}
 
 :root {
   /* Light mode colors - white background with dark text */
@@ -174,10 +238,11 @@
   --color-sidebar-ring: var(--sidebar-ring);
 
   /* Updated font families - Power Grotesk for headings, BaseNeue for UI elements */
-  /* Fonts are loaded via next/font/local in layout.tsx */
-  --font-sans: var(--font-power-grotesk), var(--font-space-grotesk), system-ui, sans-serif;
-  --font-ui: var(--font-base-neue), var(--font-space-grotesk), system-ui, sans-serif;
-  --font-mono: var(--font-outfit), monospace;
+  /* Note: Download fonts and place .woff2 files in public/fonts/ */
+  /* Space Grotesk is used as fallback until custom fonts are added */
+  --font-sans: "Power Grotesk", "Space Grotesk", "Space Grotesk Fallback", system-ui, sans-serif;
+  --font-ui: "BaseNeue", "Space Grotesk", system-ui, sans-serif;
+  --font-mono: "Outfit", "Outfit Fallback", monospace;
 }
 
 @layer base {

@@ -102,16 +102,26 @@ export function Onboarding({ onComplete }: OnboardingProps) {
 
     const handleMessage = async (event: MessageEvent) => {
       if (!isReadyPlayerMeEvent(event)) return
-      if (event.data?.source !== "readyplayerme") return
 
-      if (event.data.eventName === "v1.frame.ready" && !subscribed) {
+      let data = event.data
+      if (typeof data === "string") {
+        try {
+          data = JSON.parse(data)
+        } catch {
+          return
+        }
+      }
+
+      if (data?.source !== "readyplayerme") return
+
+      if (data.eventName === "v1.frame.ready" && !subscribed) {
         subscribed = true
         subscribeToEvents()
         return
       }
 
-      if (event.data.eventName === "v1.avatar.exported") {
-        const newAvatarUrl = event.data.data?.url
+      if (data.eventName === "v1.avatar.exported") {
+        const newAvatarUrl = data.data?.url
         if (!newAvatarUrl) return
 
         console.log("[ReadyPlayerMe] Avatar exported:", newAvatarUrl)
@@ -138,13 +148,13 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         return
       }
 
-      if (event.data.eventName === "v1.avatar.generated" || event.data.eventName === "v1.avatar.updated") {
-        if (event.data.data?.url && user?.uid) {
+      if (data.eventName === "v1.avatar.generated" || data.eventName === "v1.avatar.updated") {
+        if (data.data?.url && user?.uid) {
           try {
-            await saveAvatar(user.uid, event.data.data.url)
-            if (event.data.data?.templateId || event.data.data?.template) {
+            await saveAvatar(user.uid, data.data.url)
+            if (data.data?.templateId || data.data?.template) {
               await updateUserPreferences(user.uid, {
-                selectedTemplate: event.data.data.templateId || event.data.data.template,
+                selectedTemplate: data.data.templateId || data.data.template,
               })
             }
           } catch (error) {
@@ -154,13 +164,13 @@ export function Onboarding({ onComplete }: OnboardingProps) {
       }
 
       if (
-        event.data.eventName === "v1.avatar.template.selected" ||
-        (event.data.eventName === "v1.frame.ready" && event.data.data?.template)
+        data.eventName === "v1.avatar.template.selected" ||
+        (data.eventName === "v1.frame.ready" && data.data?.template)
       ) {
-        if (user?.uid && event.data.data?.template) {
+        if (user?.uid && data.data?.template) {
           try {
             await updateUserPreferences(user.uid, {
-              selectedTemplate: event.data.data.template,
+              selectedTemplate: data.data.template,
             })
           } catch (error) {
             console.error("Error saving template to Firebase:", error)

@@ -75,16 +75,26 @@ export function AvatarDisplay({
 
     const handleMessage = async (event: MessageEvent) => {
       if (!isReadyPlayerMeEvent(event)) return
-      if (event.data?.source !== "readyplayerme") return
 
-      if (event.data.eventName === "v1.frame.ready" && !subscribed) {
+      let data = event.data
+      if (typeof data === "string") {
+        try {
+          data = JSON.parse(data)
+        } catch {
+          return
+        }
+      }
+
+      if (data?.source !== "readyplayerme") return
+
+      if (data.eventName === "v1.frame.ready" && !subscribed) {
         subscribed = true
         subscribeToEvents()
         return
       }
 
-      if (event.data.eventName === "v1.avatar.exported") {
-        const newAvatarUrl = event.data.data?.url
+      if (data.eventName === "v1.avatar.exported") {
+        const newAvatarUrl = data.data?.url
         if (!newAvatarUrl) return
 
         console.log("[ReadyPlayerMe] Avatar exported:", newAvatarUrl)
