@@ -69,11 +69,16 @@ export function AvatarLibrary({
                       src={`${avatar.url}?quality=medium`}
                       poster={avatar.previewUrl || getAvatarPreviewUrl(avatar.url)}
                       camera-controls
+                      disable-zoom
                       auto-rotate
                       interaction-prompt="none"
                       disable-zoom
-                      shadow-intensity="0.6"
+                      shadow-intensity="0.8"
                       exposure="1"
+                      animation-name="Idle"
+                      autoplay
+                      camera-target="0m 1m 0m"
+                      camera-orbit="0deg 90deg 2.4m"
                       style={{ width: "100%", height: "100%", background: "transparent" }}
                     />
                   </div>

@@ -426,13 +426,19 @@ export function AvatarDisplay({
                 src={`${avatarUrl}?quality=high&textureAtlas=1024`}
                 poster={avatarPreview || "/placeholder-avatar.png"}
                 camera-controls
-                auto-rotate
                 disable-zoom
                 interaction-prompt="none"
                 exposure="1"
-                shadow-intensity="0.8"
-                camera-target="0m 1.4m 0m"
-                camera-orbit="0deg 90deg 2m"
+                shadow-intensity="0.9"
+                camera-target="0m 0.95m 0m"
+                camera-orbit="0deg 85deg 2.8m"
+                field-of-view="25deg"
+                animation-name="Idle"
+                autoplay
+                animation-crossfade-duration="400"
+                auto-rotate
+                auto-rotate-delay="8000"
+                auto-rotate-speed="0.25deg/s"
                 style={{ width: "100%", height: "100%", background: "transparent" }}
               />
             ) : (
