@@ -48,13 +48,20 @@ export function Onboarding({ onComplete }: OnboardingProps) {
   
   // Handle body scroll lock when modal is open
   useEffect(() => {
-    if (showAvatarCreator) {
-      // Lock body scroll
-      document.body.classList.add('modal-open')
-      
-      return () => {
-        // Restore body scroll
-        document.body.classList.remove('modal-open')
+    if (!showAvatarCreator || typeof document === "undefined") return
+
+    const body = document.body
+    const current = Number(body.dataset.modalCount || "0") + 1
+    body.dataset.modalCount = `${current}`
+    body.classList.add("modal-open")
+
+    return () => {
+      const next = Math.max(0, Number(body.dataset.modalCount || "1") - 1)
+      if (next === 0) {
+        body.classList.remove("modal-open")
+        delete body.dataset.modalCount
+      } else {
+        body.dataset.modalCount = `${next}`
       }
     }
   }, [showAvatarCreator])
@@ -106,14 +113,12 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         "v1.avatar.updated",
         "v1.avatar.template.selected",
       ].forEach((eventName) => {
-        avatarCreatorRef.current?.contentWindow?.postMessage(
-          {
-            target: "readyplayerme",
-            type: "subscribe",
-            eventName,
-          },
-          "*",
-        )
+        const payload = JSON.stringify({
+          target: "readyplayerme",
+          type: "subscribe",
+          eventName,
+        })
+        avatarCreatorRef.current?.contentWindow?.postMessage(payload, "*")
       })
     }
 
@@ -130,6 +135,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
       }
 
       if (data?.source !== "readyplayerme") return
+      console.debug("[ReadyPlayerMe] message", data.eventName, data)
 
       if (data.eventName === "v1.frame.ready" && !subscribed) {
         subscribed = true
@@ -689,7 +695,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
             }}
           >
             <button
-              className="absolute top-3 right-3 z-20 inline-flex items-center gap-1 rounded-full bg-black/60 text-white px-3 py-1 text-xs font-semibold shadow-lg sm:top-4 sm:right-4 sm:text-sm sm:px-4 sm:py-1.5"
+              className="absolute top-3 left-3 z-20 inline-flex items-center gap-1 rounded-full bg-black/60 text-white px-3 py-1 text-xs font-semibold shadow-lg sm:top-4 sm:left-4 sm:text-sm sm:px-4 sm:py-1.5"
               onClick={() => setShowAvatarCreator(false)}
             >
               <X className="h-4 w-4" />

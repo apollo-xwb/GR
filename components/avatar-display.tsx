@@ -71,6 +71,25 @@ export function AvatarDisplay({
   }, [])
 
   useEffect(() => {
+    if (!showAvatarCreator || typeof document === "undefined") return
+
+    const body = document.body
+    const current = Number(body.dataset.modalCount || "0") + 1
+    body.dataset.modalCount = `${current}`
+    body.classList.add("modal-open")
+
+    return () => {
+      const next = Math.max(0, Number(body.dataset.modalCount || "1") - 1)
+      if (next === 0) {
+        body.classList.remove("modal-open")
+        delete body.dataset.modalCount
+      } else {
+        body.dataset.modalCount = `${next}`
+      }
+    }
+  }, [showAvatarCreator])
+
+  useEffect(() => {
     if (userProfile?.readyPlayerMeAvatar) {
       setAvatarUrl(userProfile.readyPlayerMeAvatar)
       localStorage.setItem("readyPlayerMeAvatar", userProfile.readyPlayerMeAvatar)
@@ -87,14 +106,12 @@ export function AvatarDisplay({
 
     const subscribeToEvents = () => {
       if (!avatarCreatorRef.current?.contentWindow) return
-      avatarCreatorRef.current.contentWindow.postMessage(
-        {
-          target: "readyplayerme",
-          type: "subscribe",
-          eventName: "v1.avatar.exported",
-        },
-        "*",
-      )
+      const payload = JSON.stringify({
+        target: "readyplayerme",
+        type: "subscribe",
+        eventName: "v1.avatar.exported",
+      })
+      avatarCreatorRef.current.contentWindow.postMessage(payload, "*")
     }
 
     const handleMessage = async (event: MessageEvent) => {
@@ -110,6 +127,7 @@ export function AvatarDisplay({
       }
 
       if (data?.source !== "readyplayerme") return
+      console.debug("[ReadyPlayerMe] message", data.eventName, data)
 
       if (data.eventName === "v1.frame.ready" && !subscribed) {
         subscribed = true
@@ -257,7 +275,7 @@ export function AvatarDisplay({
           <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center">
             <div className="relative w-full h-full md:w-[90vw] md:h-[85vh] md:max-w-3xl md:rounded-2xl bg-background overflow-hidden shadow-2xl border-0 md:border-4 heatwave-border flex flex-col">
               <button
-                className="absolute top-3 right-3 z-20 inline-flex items-center gap-1 rounded-full bg-black/60 text-white px-3 py-1 text-xs font-semibold shadow-lg"
+                className="absolute top-3 left-3 z-20 inline-flex items-center gap-1 rounded-full bg-black/60 text-white px-3 py-1 text-xs font-semibold shadow-lg"
                 onClick={() => setShowAvatarCreator(false)}
               >
                 <X className="h-3.5 w-3.5" />
@@ -349,7 +367,7 @@ export function AvatarDisplay({
         <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center">
           <div className="relative w-full h-full md:w-[90vw] md:h-[85vh] md:max-w-3xl md:rounded-2xl bg-background overflow-hidden shadow-2xl border-0 md:border-4 heatwave-border flex flex-col">
             <button
-              className="absolute top-4 right-4 z-20 inline-flex items-center gap-1 rounded-full bg-black/60 text-white px-4 py-1.5 text-sm font-semibold shadow-lg"
+              className="absolute top-4 left-4 z-20 inline-flex items-center gap-1 rounded-full bg-black/60 text-white px-4 py-1.5 text-sm font-semibold shadow-lg"
               onClick={() => setShowAvatarCreator(false)}
             >
               <X className="h-4 w-4" />
