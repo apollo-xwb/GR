@@ -33,11 +33,3 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# Font files (keep directory, ignore actual font files)
-fonts/*.woff2
-fonts/*.woff
-fonts/*.ttf
-fonts/*.otf
-!fonts/README.md
-!fonts/.gitkeep
-
